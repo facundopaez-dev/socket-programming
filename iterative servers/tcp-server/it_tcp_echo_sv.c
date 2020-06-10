@@ -6,7 +6,7 @@ argumento es el numero de un puerto que no sea ninguno de los puertos bien conoc
 #include <stdio.h>
 #include <arpa/inet.h>
 #define CONNECTION_LIMIT 1
-#define BUF_SIZE 500 /* Maximum size of datagrams that can be read by client and server */
+#define BUF_SIZE 500 /* Maximo tamaño del bufer para los flujos de datos que pueden leer el cliente y el servidor */
 
 int main(int argc, char *argv[]) {
   int socketfd;
@@ -34,6 +34,14 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  int optval = 1;
+
+  // Esto indica que el puerto esta marcado para reutilizar
+  if(setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval, sizeof(optval)) == -1) {
+    perror("setsockopt");
+    exit(EXIT_FAILURE);
+  }
+
   bindfd = bind(socketfd, (struct sockaddr*) &addr, addrlen);
 
   if (bindfd == -1) {
@@ -48,24 +56,26 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  /* Receive streams and return copies to senders */
+  acceptfd = accept(socketfd, (struct sockaddr*) &addr, &addrlen);
+
+  if (acceptfd == -1) {
+    perror("Accept error: Could not accept");
+    exit(EXIT_FAILURE);
+  }
+
+  /* Recibe flujos de datos y retorna copia a los emisores */
   for (;;) {
-    acceptfd = accept(socketfd, (struct sockaddr*) &addr, &addrlen);
-
-    if (acceptfd == -1) {
-      perror("Could not accept");
-      exit(EXIT_FAILURE);
-    }
-
     len = sizeof(struct sockaddr_storage);
-    numRead = recvfrom(socketfd, buf, BUF_SIZE, 0, (struct sockaddr *) &claddr, &len);
+    numRead = recv(acceptfd, buf, BUF_SIZE, 0);
+    buf[numRead] = '\0';
+
     printf("%s\n", buf);
 
     if (numRead == -1) {
       fprintf(stderr, "%s\n", buf);
     }
 
-    if (sendto(socketfd, buf, numRead, 0, (struct sockaddr *) &claddr, len) != numRead) {
+    if (send(acceptfd, buf, numRead, 0) != numRead) {
       fprintf(stderr, "%s\n", buf);
     }
 
