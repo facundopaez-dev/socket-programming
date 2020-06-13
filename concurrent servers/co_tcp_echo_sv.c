@@ -2,20 +2,107 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <string.h>
 #include <unistd.h>
+#include "commands.h"
+#include "answers.h"
 #define CONNECTION_LIMIT 10
 #define BUF_SIZE 4096 /* Maximo tamaño del bufer para los flujos de datos que pueden leer el cliente y el servidor */
+
+static void response(int acceptfd, char* answer) {
+
+  if (write(acceptfd, answer, strlen(answer) + 1) >= 0) {
+    printf("%s\n", answer);
+  }
+
+}
+
+static void turnon(int acceptfd, const char* buf) {
+
+  if (strcmp(buf, TURN_ON) == 0) {
+    response(acceptfd, ANSWER_TURN_ON);
+  }
+
+}
+
+static void turnoff(int acceptfd, const char* buf) {
+
+  if (strcmp(buf, TURN_OFF) == 0) {
+    response(acceptfd, ANSWER_TURN_OFF);
+  }
+
+}
+
+static void ienable(int acceptfd, const char* buf) {
+
+  if (strcmp(buf, I_ENABLE) == 0) {
+    response(acceptfd, ANSWER_I_ENABLE);
+  }
+
+}
+
+static void idisable(int acceptfd, const char* buf) {
+
+  if (strcmp(buf, I_DISABLE) == 0) {
+    response(acceptfd, ANSWER_I_DISABLE);
+  }
+
+}
+
+static void rimage(int acceptfd, const char* buf) {
+
+  if (strcmp(buf, R_IMAGE) == 0) {
+    response(acceptfd, ANSWER_R_IMAGE);
+  }
+
+}
+
+static void takecall(int acceptfd, const char* buf) {
+
+  if (strcmp(buf, TAKE_CALL) == 0) {
+    response(acceptfd, ANSWER_TAKE_CALL);
+  }
+
+}
+
+static void disconnect(int acceptfd, const char* buf) {
+
+  // Falta eliminar el fd del cliente del arreglo que contiene los fd de cada cliente conectado
+
+  if (strcmp(buf, EXIT) == 0) {
+    response(acceptfd, ANSWER_EXIT);
+  }
+
+}
+
+static void ping(int acceptfd, const char* buf) {
+
+  if (strcmp(buf, PING) == 0) {
+    response(acceptfd, ANSWER_PING);
+  }
+
+}
 
 /* Handle a client request: copy socket input back to socket */
 static void handleRequest(int acceptfd) {
   char buf[BUF_SIZE];
+  char returnBuf[BUF_SIZE];
   ssize_t numRead;
 
   while ((numRead = read(acceptfd, buf, BUF_SIZE)) > 0) {
-    if (write(acceptfd, buf, numRead) != numRead) {
-      printf("%s\n", buf);
-      exit(EXIT_FAILURE);
-    }
+    // Esto suprime el \n de la cadena enviada por el cliente
+    buf[numRead - 1] = '\0';
+
+    // Ejecucion de cada comando
+    turnon(acceptfd, buf);
+    turnoff(acceptfd, buf);
+    ienable(acceptfd, buf);
+    idisable(acceptfd, buf);
+    rimage(acceptfd, buf);
+    takecall(acceptfd, buf);
+    disconnect(acceptfd, buf);
+    ping(acceptfd, buf);
+
   } // End while
 
   if (numRead == -1) {

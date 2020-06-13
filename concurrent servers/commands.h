@@ -1,0 +1,8 @@
+#define TURN_ON "turnon"
+#define TURN_OFF "turnoff"
+#define I_ENABLE "ienable"
+#define I_DISABLE "idisable"
+#define R_IMAGE "rimage"
+#define TAKE_CALL "takecall"
+#define EXIT "exit"
+#define PING "ping"

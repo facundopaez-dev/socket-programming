@@ -7,6 +7,8 @@ Un cliente puede realizar las siguientes solicitudes a un servidor:
 - Activar o desactivar el riego automático.
 - Solicitar una imagen al portero eléctrico.
 - Contestar una llamada del portero eléctrico.
+- Desconectarse del servidor.
+- Comprobar si el servidor está en funcionamiento.
 
 Para esto se dispondrá de los siguientes comandos:  
 - turnon para encender las luces.
@@ -15,6 +17,8 @@ Para esto se dispondrá de los siguientes comandos:
 - idisable para desactivar el riego automático.
 - rimage para solicitar una imagen al portero eléctrico.
 - takecall para contestar una llamada del portero eléctrico.
+- exit para desconectarse del servidor.
+- ping para comprobar si el servidor está en funcionamiento.
 
 **turnon** retorna el mensaje "light on".  
 **turnoff** retorna el mensaje "light off".  
@@ -22,4 +26,5 @@ Para esto se dispondrá de los siguientes comandos:
 **idisable** retorna el mensaje "irrigation disabled".  
 **rimage** retorna el mensaje "image sended".  
 **takecall** retorna el mensaje "taken call".  
+**exit** reotrna el mensaje "successful desconnection".  
 **ping** retorna el mensaje "I'm listening".
