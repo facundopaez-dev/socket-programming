@@ -2,11 +2,18 @@
 Este documento contiene los mensajes del protocolo de comunicación (el cual es un protocolo de la capa de aplicación) que podrán ser utilizados por el cliente y el servidor para comunicarse entre ellos.
 
 ## Mensajes del protocolo de comunicación
-Un cliente puede realizar las siguientes solicitudes a un servidor:  
-- Encender o apagar las luces.  
-- Activar o desactivar el riego automático.
+Un cliente puede realizar las siguientes solicitudes al servidor:  
+- Encender las luces.
+- Apagar las luces.  
+- Activar el riego automático.
+- Desactivar el riego automático.
+- Enviar una imagen al portero eléctrico.  
 - Solicitar una imagen al portero eléctrico.
+- Hacer una llamada al portero eléctrico.  
 - Contestar una llamada del portero eléctrico.
+- Enviar audio al portero eléctrico.  
+- Recibir audio del portero eléctrico.  
+- Solicitar ID (identificador).  
 - Desconectarse del servidor.
 - Comprobar si el servidor está en funcionamiento.
 
@@ -15,16 +22,37 @@ Para esto se dispondrá de los siguientes comandos:
 - turnoff para apagar las luces.
 - ienable para activar el riego automático.
 - idisable para desactivar el riego automático.
+- simage para enviar una imagen al portero eléctrico haciendo uso de un número de departamento.
 - rimage para solicitar una imagen al portero eléctrico.
+- callto para llamar al portero eléctrico haciendo uso de un número de departamento.
 - takecall para contestar una llamada del portero eléctrico.
+- sendaudio para enviar audio al portero eléctrico haciendo uso de un número de departamento.
+- recaudio para recibir audio del portero eléctrico.
+- id para saber el ID propio.
 - exit para desconectarse del servidor.
 - ping para comprobar si el servidor está en funcionamiento.
 
-**turnon** retorna el mensaje "light on".  
-**turnoff** retorna el mensaje "light off".  
-**ienable** retorna el mensaje "irrigation enabled".  
-**idisable** retorna el mensaje "irrigation disabled".  
-**rimage** retorna el mensaje "image sended".  
-**takecall** retorna el mensaje "taken call".  
-**exit** reotrna el mensaje "successful desconnection".  
-**ping** retorna el mensaje "I'm listening".
+**turnon** retorna al emisor el mensaje "light on".  
+**turnoff** retorna al emisor el mensaje "light off".  
+**ienable** retorna al emisor el mensaje "irrigation enabled".  
+**idisable** retorna al emisor el mensaje "irrigation disabled".  
+**exit** retorna el mensaje "successful desconnection".  
+**ping** retorna el mensaje "I'm listening".  
+**id** retorna el ID del cliente.
+
+**simage** utiliza como argumento el número de departamento del cliente al que se quiere enviar una imagen. En el caso en el cual existe el número de departamento y el cliente solicitado esté conectado retorna al emisor el mensaje "image sent", mientras que al receptor se le envía un **aviso** con el siguiente mensaje "the client of the department (number) sent you an image".  
+
+**rimage** retorna al receptor el mensaje "image (number) received" en el caso de que un cliente haya enviado una imagen al portero eléctrico, en caso contrario retorna el mensaje "there is no image to see".  
+
+**callto** utiliza como argumento el número de departamento del cliente al que se quiere llamar. En el caso en el cual existe el número de departamento y el cliente solicitado esté conectado retorna al emisor el mensaje "call sent", mientras que al receptor se le envía un **aviso** con el siguiente mensaje "the client of the department (number) is calling you".  
+
+**takecall** retorna al receptor el mensaje "call (number) taken" en caso de que haya un cliente llamando al portero eléctrico, en caso contrario retorna el mensaje "no incoming calls".  
+
+**sendaudio** utiliza como argumento el número de departamento del cliente al que se quiere enviar audio. En el caso en el cual existe el número de departamento y el cliente solicitado esté conectado retorna al emisor el mensaje "audio sent", mientras que al receptor se le envía un **aviso** con el siguiente mensaje "the client of the department (number) sent you an audio".  
+
+**recaudio** retorna al receptor el mensaje "audio (number) received" en caso de que haya un audio disponible para escuchar, en caso contrario retorna el mensaje "there are no audios to listen".  
+
+Para los comandos simage, callto y sendaudio:
+- En el caso en el cual no existe el número de departamento se devuelve el mensaje "department number does not exist".
+- En el caso de que sí existe el número de departamento y el cliente solicitado no esté conectado se devuelve el mensaje "the requested client is not connected".
+- En el caso en el cual se utiliza como argumento el número de departamento del emisor se devuelve el mensaje "Can't send a message to the same department".

@@ -21,10 +21,8 @@ Los clientes podrán:
 - Solicitar una imagen al portero eléctrico.  
 - Contestar una llamada del portero eléctrico.
 
-Documentar el protocolo desarrollado teniendo en cuenta la estructura de una propuesta
-de RFC.
+Documentar el protocolo desarrollado teniendo en cuenta la estructura de una propuesta de RFC.
 
 **Programar en lenguaje C el protocolo de comunicación definido. Implementar clientes y el servidor.**
 
-**Documentar las decisiones de diseño tomadas para llegar a la implementación que se
-entrega.**
+**Documentar las decisiones de diseño tomadas para llegar a la implementación que se entrega.**
