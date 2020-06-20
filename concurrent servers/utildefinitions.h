@@ -2,6 +2,8 @@
 #define FREE_CONNECTION -1
 #define BUF_SIZE 4096 /* Maximo tamaño del bufer para los flujos de datos que pueden leer el cliente y el servidor */
 
+int sendResultClientUdp(int acceptfd, char* answer, int numRead, const struct sockaddr *claddr, socklen_t len);
+
 int sendResultClient(int acceptfd, char* answer);
 
 void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite, int clients[]);
@@ -33,3 +35,7 @@ void concatenateTextNotification(char* notification, char* firstPartNotification
 void fill(int clients[]);
 
 char convertIntToChar(int number);
+
+int getFdSocketTcp(char* ip, char* port);
+
+int getFdSocketUdp(char* ip, char* port);

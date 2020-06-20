@@ -3,10 +3,17 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <sys/socket.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
 #include "utildefinitions.h"
 #include "answers.h"
 
 // TODO: Documentar lo que falte documentar
+
+int sendResultClientUdp(int acceptfd, char* answer, int numRead, const struct sockaddr *claddr, socklen_t len) {
+  return sendto(acceptfd, answer, numRead, 0, claddr, len);
+}
 
 int sendResultClient(int acceptfd, char* answer) {
   return write(acceptfd, answer, strlen(answer) + 1);
@@ -247,4 +254,84 @@ void fill(int clients[]) {
 
 char convertIntToChar(int number) {
   return number + '0';
+}
+
+int getFdSocketTcp(char* ip, char* port) {
+  int sockettcpfd;
+  int bindtcpfd;
+  int listentcpfd;
+
+  socklen_t addrlentcp;
+  struct sockaddr_in addrtcp;
+
+  addrlentcp = sizeof(addrtcp);
+
+  inet_aton(ip, &(addrtcp.sin_addr));
+  addrtcp.sin_port = htons(atoi(port));
+  addrtcp.sin_family = AF_INET; /* Constante que indica el uso de IPv4 */
+
+  sockettcpfd = socket(AF_INET, SOCK_STREAM, 0);
+
+  if (sockettcpfd == -1) {
+    perror("Socket error: Could not create server socket");
+    exit(EXIT_FAILURE);
+  }
+
+  int optval = 1;
+
+  // Esto indica que el puerto esta marcado para reutilizar
+  if(setsockopt(sockettcpfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval, sizeof(optval)) == -1) {
+    perror("setsockopt");
+    exit(EXIT_FAILURE);
+  }
+
+  bindtcpfd = bind(sockettcpfd, (struct sockaddr*) &addrtcp, addrlentcp);
+
+  if (bindtcpfd == -1) {
+    perror("Bind error: Could not bind server socket");
+    exit(EXIT_FAILURE);
+  }
+
+  listentcpfd = listen(sockettcpfd, CONNECTION_LIMIT);
+
+  if (listentcpfd == -1) {
+    perror("Could not listen");
+    exit(EXIT_FAILURE);
+  }
+
+  return sockettcpfd;
+}
+
+int getFdSocketUdp(char* ip, char* port) {
+  int socketudpfd;
+  int bindudpfd;
+  socklen_t addrlenudp;
+
+  struct sockaddr_in addrudp;
+  addrlenudp = sizeof(addrudp);
+
+  inet_aton(ip, &(addrudp.sin_addr));
+  addrudp.sin_port = htons(atoi(port));
+
+  /* La constante AF_INET indica que la comunicacion entre los clientes
+  y el servidor (ambos son aplicaciones) va a ser utilizando el protocolo IPv4 */
+  addrudp.sin_family = AF_INET;
+
+  /* La constante SOCK_DGRAM sirve para indicar que se va a crear un
+  socket de datagramas (servicio no orientado a la conexion) */
+  socketudpfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+  if (socketudpfd == -1) {
+    perror("Socket error: Could not create server socket");
+    exit(EXIT_FAILURE);
+  }
+
+  bindudpfd = bind(socketudpfd, (struct sockaddr*) &addrudp, addrlenudp);
+
+  if (bindudpfd == -1) {
+    perror("Bind error: Could not bind server socket");
+    exit(EXIT_FAILURE);
+  }
+
+  return socketudpfd;
 }

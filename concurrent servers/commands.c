@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <arpa/inet.h>
 #include "answers.h"
 #include "namecommands.h"
 #include "utildefinitions.h"
@@ -60,8 +62,24 @@ void idisable(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_m
 void rimage(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
 
   if (strcmp(buf, R_IMAGE) == 0) {
-    int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_R_IMAGE);
-    sendResultServer(acceptfd, R_IMAGE, ANSWER_RECEIVER_R_IMAGE, resultWrite, clients);
+    struct sockaddr_storage claddr;
+    socklen_t len = sizeof(struct sockaddr_storage);
+    // char buffer[BUF_SIZE];
+    //
+    // int numRead = recvfrom(acceptfd, buffer, BUF_SIZE, 0, (struct sockaddr *) &claddr, &len);
+    //
+    // if (numRead == -1) {
+    //   perror("recvfrom");
+    // }
+
+    int resultWrite = sendResultClientUdp(acceptfd, ANSWER_RECEIVER_R_IMAGE, strlen(ANSWER_RECEIVER_R_IMAGE), (struct sockaddr *) &claddr, len);
+
+    if (resultWrite == -1) {
+      fprintf(stderr, "%s\n", buf);
+    }
+
+    // sendResultServer(acceptfd, R_IMAGE, ANSWER_RECEIVER_R_IMAGE, resultWrite, clients);
+
     pthread_mutex_lock(&lock);
     *sendDefaultMessage = false;
     pthread_mutex_unlock(&lock);

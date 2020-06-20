@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <pthread.h>
-#include <ctype.h>
 #include "namecommands.h"
 #include "answers.h"
 #include "commandsdefinitions.h"
@@ -41,6 +40,7 @@ pthread_mutex_t lock;
  */
 struct structparams {
   int acceptfd;
+  int socketudpfd;
   int *amountConnections;
 };
 
@@ -51,12 +51,6 @@ void *handleRequest(void *args);
 
 int main(int argc, char *argv[]) {
   pthread_t thread;
-
-  int socketfd;
-  int bindfd;
-  int listenfd;
-  int acceptfd;
-  int resultPthreadCreate;
 
   /*
    * Variable utilizada para manejar la cantidad de conexiones
@@ -70,9 +64,6 @@ int main(int argc, char *argv[]) {
    */
   fill(clients);
 
-  ssize_t numRead;
-  socklen_t addrlen, len;
-
   /*
    * Este arreglo contiene la cadena de texto que sera enviada
    * a aquellos clientes que no puedan conectarse al servidor,
@@ -81,44 +72,13 @@ int main(int argc, char *argv[]) {
    */
   char messageLimitConnextions[BUF_SIZE] = ANSWER_LIMIT_CONNECTIONS;
 
-  struct sockaddr_storage claddr;
+  int resultPthreadCreate;
+  int sockettcpfd = getFdSocketTcp(argv[1], argv[2]);
+  int acceptfd;
+  int socketudpfd;
+
+  socklen_t addrlen;
   struct sockaddr_in addr;
-
-  addrlen = sizeof(addr);
-
-  inet_aton(argv[1], &(addr.sin_addr));
-  addr.sin_port = htons(atoi(argv[2]));
-  addr.sin_family = AF_INET; /* Constante que indica el uso de IPv4 */
-
-  socketfd = socket(AF_INET, SOCK_STREAM, 0);
-
-  if (socketfd == -1) {
-    perror("Socket error: Could not create server socket");
-    exit(EXIT_FAILURE);
-  }
-
-  int optval = 1;
-
-  // Esto indica que el puerto esta marcado para reutilizar
-  if(setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval, sizeof(optval)) == -1) {
-    perror("setsockopt");
-    exit(EXIT_FAILURE);
-  }
-
-  bindfd = bind(socketfd, (struct sockaddr*) &addr, addrlen);
-
-  if (bindfd == -1) {
-    perror("Bind error: Could not bind server socket");
-    exit(EXIT_FAILURE);
-  }
-
-  listenfd = listen(socketfd, CONNECTION_LIMIT);
-
-  if (listenfd == -1) {
-    perror("Could not listen");
-    exit(EXIT_FAILURE);
-  }
-
   struct structparams params;
 
   for (;;) {
@@ -130,7 +90,8 @@ int main(int argc, char *argv[]) {
      * conexion
      */
     if (amountConnections < CONNECTION_LIMIT) {
-      acceptfd = accept(socketfd, NULL, NULL); /* Wait for connection */
+      acceptfd = accept(sockettcpfd, NULL, NULL); /* Wait for connection */
+      socketudpfd = getFdSocketUdp(argv[1], argv[2]);
 
       if (acceptfd == -1) {
         perror("Accept error: Could not accept");
@@ -140,6 +101,7 @@ int main(int argc, char *argv[]) {
       // printf("%s%i\n", "Cantidad de conexiones: ", amountConnections);
 
       params.acceptfd = acceptfd;
+      params.socketudpfd = socketudpfd;
       params.amountConnections = &amountConnections;
 
       /* Handle each client request in a new thread */
@@ -158,12 +120,13 @@ int main(int argc, char *argv[]) {
 
       /*
        * En caso de que haya un error al crear un hilo, se tiene
-       * que avisar de esto y ademas se tiene que cerrar el socket
-       * creado previamente
+       * que avisar de esto y ademas se tienen que cerrar los sockets
+       * TCP y UDP abiertos previamente
        */
       if (resultPthreadCreate != 0) {
         printf("ERROR: return code from pthread_create() is %i\n", resultPthreadCreate);
         close(acceptfd);
+        close(socketudpfd);
       }
 
     } // End if
@@ -174,7 +137,7 @@ int main(int argc, char *argv[]) {
      * al cliente que esta tratandose de conectar al servidor
      */
     if (amountConnections == CONNECTION_LIMIT) {
-      acceptfd = accept(socketfd, (struct sockaddr*) &addr, &addrlen);
+      acceptfd = accept(sockettcpfd, (struct sockaddr*) &addr, &addrlen);
       send(acceptfd, messageLimitConnextions, BUF_SIZE, 0);
       close(acceptfd);
     }
@@ -188,7 +151,8 @@ void *handleRequest(void *args) {
   struct structparams *params = (struct structparams *) args;
 
   int acceptfd = params -> acceptfd;
-  int idDepartment;
+  int socketudpfd = params -> socketudpfd;
+  int idDepartment = 0;
 
   char buf[BUF_SIZE];
   char nameCommandBuf[BUF_SIZE];
@@ -198,6 +162,21 @@ void *handleRequest(void *args) {
   sendDefaultMessage = true;
   disconnection = false;
   pthread_mutex_unlock(&lock);
+
+  // Creacion de socket UDP
+  // int socketudpfd;
+  // int budpfd;
+  //
+  // struct sockaddr sudpaddr;
+  // socklen_t udpaddrlen;
+  //
+  // udpaddrlen = sizeof(sudpaddr);
+  //
+  // getsockname(acceptfd, &sudpaddr, &udpaddrlen);
+  //
+  // socketudpfd = socket(AF_INET, SOCK_DGRAM, 0);
+  //
+  // budpfd = bind(socketudpfd, (struct sockaddr*) &sudpaddr, udpaddrlen);
 
   // Usar funcion getSockName, se puede crear un socket UDP aca
   // el cual esta asociado al mismo puerto e IP (si se hace uso)
@@ -211,29 +190,78 @@ void *handleRequest(void *args) {
      * diferentes
      */
     buf[numRead - 1] = '\0';
+    sscanf(buf, "%s%d", nameCommandBuf, &idDepartment);
+
+    // Si el comando es para TCP, ejecutar comandos de TCP
+    // Imagen, luces, riego, desconexion, ping, id
+    if (strcmp(nameCommandBuf, TURN_ON) == 0) {
+      turnon(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    if(strcmp(nameCommandBuf, TURN_OFF) == 0) {
+      turnoff(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    if(strcmp(nameCommandBuf, I_ENABLE) == 0) {
+      ienable(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    if(strcmp(nameCommandBuf, I_DISABLE) == 0) {
+      idisable(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    if(strcmp(nameCommandBuf, EXIT) == 0) {
+      disconnect(acceptfd, &sendDefaultMessage, &disconnection, nameCommandBuf, params -> amountConnections, lock, clients);
+    }
+
+    if(strcmp(nameCommandBuf, PING) == 0) {
+      ping(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    if(strcmp(nameCommandBuf, ID) == 0) {
+      id(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    // Si el comando es para UDP, ejecutar comandos de UDP
+    // Audio, llamada
+
+    if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
+      rimage(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    if (strcmp(nameCommandBuf, TAKE_CALL) == 0) {
+      takecall(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
+    if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
+      recaudio(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
 
     // Ejecucion de cada comando
-    turnon(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    turnoff(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    ienable(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    idisable(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    rimage(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    takecall(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    recaudio(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    id(acceptfd, &sendDefaultMessage, buf, lock, clients);
-    disconnect(acceptfd, &sendDefaultMessage, &disconnection, buf, params -> amountConnections, lock, clients);
-    ping(acceptfd, &sendDefaultMessage, buf, lock, clients);
+    // turnon(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // turnoff(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // ienable(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // idisable(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // rimage(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // takecall(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // recaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // id(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    // disconnect(acceptfd, &sendDefaultMessage, &disconnection, nameCommandBuf, params -> amountConnections, lock, clients);
+    // ping(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
 
     /*
      * Separa el nombre del comando del argumento, el cual
-     * es el ID de un departamento (recordar que en el
-     * arreglo de conexiones es una posicion)
+     * es el ID de un departamento
+     *
+     * Hay que recordar que el ID de un departamento en el
+     * arreglo de conexiones es una celda del arreglo, y
+     * por ende, es el indice de esa celda
      */
-    sscanf(buf, "%s%d", nameCommandBuf, &idDepartment);
+    // sscanf(buf, "%s%d", nameCommandBuf, &idDepartment);
 
-    simage(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
-    callto(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
-    sendaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+    // simage(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+    // callto(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+    // sendaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
 
     pthread_mutex_lock(&lock);
     if (sendDefaultMessage) {
