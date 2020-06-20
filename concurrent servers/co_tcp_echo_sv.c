@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
      */
     if (amountConnections < CONNECTION_LIMIT) {
       acceptfd = accept(sockettcpfd, NULL, NULL); /* Wait for connection */
-      socketudpfd = getFdSocketUdp(argv[1], argv[2]);
+      socketudpfd = getFdSocketUdp(acceptfd);
 
       if (acceptfd == -1) {
         perror("Accept error: Could not accept");
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     /*
      * Si la variable cantidad de conexiones es igual al
      * limite de conexiones, entonces se tiene que rechazar
-     * al cliente que esta tratandose de conectar al servidor
+     * al cliente que esta tratandose de conectarse al servidor
      */
     if (amountConnections == CONNECTION_LIMIT) {
       acceptfd = accept(sockettcpfd, (struct sockaddr*) &addr, &addrlen);
@@ -163,25 +163,6 @@ void *handleRequest(void *args) {
   disconnection = false;
   pthread_mutex_unlock(&lock);
 
-  // Creacion de socket UDP
-  // int socketudpfd;
-  // int budpfd;
-  //
-  // struct sockaddr sudpaddr;
-  // socklen_t udpaddrlen;
-  //
-  // udpaddrlen = sizeof(sudpaddr);
-  //
-  // getsockname(acceptfd, &sudpaddr, &udpaddrlen);
-  //
-  // socketudpfd = socket(AF_INET, SOCK_DGRAM, 0);
-  //
-  // budpfd = bind(socketudpfd, (struct sockaddr*) &sudpaddr, udpaddrlen);
-
-  // Usar funcion getSockName, se puede crear un socket UDP aca
-  // el cual esta asociado al mismo puerto e IP (si se hace uso)
-  // de la funcion getSockName
-
   while ((numRead = read(acceptfd, buf, BUF_SIZE)) > 0) {
     /*
      * Esto suprime el \n de la cadena enviada por el cliente
@@ -190,10 +171,24 @@ void *handleRequest(void *args) {
      * diferentes
      */
     buf[numRead - 1] = '\0';
+
+    /*
+     * Separa el nombre del comando del argumento, el cual
+     * es el ID de un departamento
+     *
+     * Hay que recordar que el ID de un departamento en el
+     * arreglo de conexiones es una celda del arreglo, y
+     * por ende, es el indice de esa celda
+     */
     sscanf(buf, "%s%d", nameCommandBuf, &idDepartment);
 
-    // Si el comando es para TCP, ejecutar comandos de TCP
-    // Imagen, luces, riego, desconexion, ping, id
+    /*
+     * Si el comando es para TCP, se tiene que ejecutar
+     * haciendo uso del protocolo TCP
+     *
+     * Comandos: Luces, riego, imagen, desconexion,
+     * ping y id
+     */
     if (strcmp(nameCommandBuf, TURN_ON) == 0) {
       turnon(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
     }
@@ -210,6 +205,14 @@ void *handleRequest(void *args) {
       idisable(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
     }
 
+    if (strcmp(nameCommandBuf, S_IMAGE) == 0) {
+      simage(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+    }
+
+    if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
+      rimage(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    }
+
     if(strcmp(nameCommandBuf, EXIT) == 0) {
       disconnect(acceptfd, &sendDefaultMessage, &disconnection, nameCommandBuf, params -> amountConnections, lock, clients);
     }
@@ -222,19 +225,26 @@ void *handleRequest(void *args) {
       id(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
     }
 
-    // Si el comando es para UDP, ejecutar comandos de UDP
-    // Audio, llamada
+    /*
+     * Si el comando es para UDP, se tiene que ejecutar
+     * haciendo uso del protocolo UDP
+     *
+     * Comandos: Audio, llamada
+     */
+    if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
+      sendaudio(socketudpfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+    }
 
-    if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
-      rimage(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
+      recaudio(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
     }
 
     if (strcmp(nameCommandBuf, TAKE_CALL) == 0) {
       takecall(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
     }
 
-    if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
-      recaudio(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+    if (strcmp(nameCommandBuf, CALL_TO) == 0 ) {
+      callto(socketudpfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
     }
 
     // Ejecucion de cada comando
@@ -354,12 +364,14 @@ void *handleRequest(void *args) {
   }
 
   /*
-   * Si el flujo de ejecucion llega hasta aca es porque el
-   * cliente ha decidido desconectarse y por ende se tiene
-   * que cerrar el socket asociado al valor de la variable
-   * entera socketfd
+   * Si el flujo de ejecucion del programa servidor llega hasta
+   * aca es porque el cliente ha decidido desconectarse y por
+   * ende se tienen que cerrar los sockets TCP y UDP (abiertos)
+   * asociados al valor de las variables enteras enviadas como
+   * argumentos a la funcion close
    */
   close(acceptfd);
+  close(socketudpfd);
 
   /*
    * Hace que el hilo invocante deje de ejecutarse, es

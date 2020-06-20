@@ -38,4 +38,4 @@ char convertIntToChar(int number);
 
 int getFdSocketTcp(char* ip, char* port);
 
-int getFdSocketUdp(char* ip, char* port);
+int getFdSocketUdp(int acceptfd);

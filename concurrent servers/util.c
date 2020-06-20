@@ -268,8 +268,13 @@ int getFdSocketTcp(char* ip, char* port) {
 
   inet_aton(ip, &(addrtcp.sin_addr));
   addrtcp.sin_port = htons(atoi(port));
-  addrtcp.sin_family = AF_INET; /* Constante que indica el uso de IPv4 */
+  addrtcp.sin_family = AF_INET;
 
+  /*
+   * AF_INET y SOCK_STREAM indican que este socket
+   * usa IPv4 y flujos respectivamente para hacer
+   * la comunicacion entre un cliente y el servidor
+   */
   sockettcpfd = socket(AF_INET, SOCK_STREAM, 0);
 
   if (sockettcpfd == -1) {
@@ -302,23 +307,24 @@ int getFdSocketTcp(char* ip, char* port) {
   return sockettcpfd;
 }
 
-int getFdSocketUdp(char* ip, char* port) {
+int getFdSocketUdp(int acceptfd) {
   int socketudpfd;
   int bindudpfd;
-  socklen_t addrlenudp;
 
-  struct sockaddr_in addrudp;
-  addrlenudp = sizeof(addrudp);
+  struct sockaddr sudpaddr;
+  socklen_t udpaddrlen = sizeof(sudpaddr);
 
-  inet_aton(ip, &(addrudp.sin_addr));
-  addrudp.sin_port = htons(atoi(port));
+  /*
+   * La funcion getsockname carga una struct sockaddr
+   * con la IP y el puerto del servidor
+   */
+  getsockname(acceptfd, &sudpaddr, &udpaddrlen);
 
-  /* La constante AF_INET indica que la comunicacion entre los clientes
-  y el servidor (ambos son aplicaciones) va a ser utilizando el protocolo IPv4 */
-  addrudp.sin_family = AF_INET;
-
-  /* La constante SOCK_DGRAM sirve para indicar que se va a crear un
-  socket de datagramas (servicio no orientado a la conexion) */
+  /*
+   * AF_INET y SOCK_DGRAM indican que este socket
+   * usa IPv4 y datagramas respectivamente para hacer
+   * la comunicacion entre un cliente y un servidor
+   */
   socketudpfd = socket(AF_INET, SOCK_DGRAM, 0);
 
   if (socketudpfd == -1) {
@@ -326,7 +332,15 @@ int getFdSocketUdp(char* ip, char* port) {
     exit(EXIT_FAILURE);
   }
 
-  bindudpfd = bind(socketudpfd, (struct sockaddr*) &addrudp, addrlenudp);
+  int optval = 1;
+
+  // Esto indica que el puerto esta marcado para reutilizar
+  if(setsockopt(socketudpfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval, sizeof(optval)) == -1) {
+    perror("setsockopt");
+    exit(EXIT_FAILURE);
+  }
+
+  bindudpfd = bind(socketudpfd, (struct sockaddr*) &sudpaddr, udpaddrlen);
 
   if (bindudpfd == -1) {
     perror("Bind error: Could not bind server socket");

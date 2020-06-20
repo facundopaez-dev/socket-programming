@@ -11,6 +11,9 @@
 
 // TODO: Documentar lo que haga falta documentar
 
+/*
+ * Comandos para encender y apagar las luces
+ */
 void turnon(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
 
   if (strcmp(buf, TURN_ON) == 0) {
@@ -35,6 +38,9 @@ void turnoff(int acceptfd,  bool* sendDefaultMessage, const char* buf, pthread_m
 
 }
 
+/*
+ * Comandos para activar y desactivar el riego automatico
+ */
 void ienable(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
 
   if (strcmp(buf, I_ENABLE) == 0) {
@@ -59,129 +65,9 @@ void idisable(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_m
 
 }
 
-void rimage(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-
-  if (strcmp(buf, R_IMAGE) == 0) {
-    struct sockaddr_storage claddr;
-    socklen_t len = sizeof(struct sockaddr_storage);
-    // char buffer[BUF_SIZE];
-    //
-    // int numRead = recvfrom(acceptfd, buffer, BUF_SIZE, 0, (struct sockaddr *) &claddr, &len);
-    //
-    // if (numRead == -1) {
-    //   perror("recvfrom");
-    // }
-
-    int resultWrite = sendResultClientUdp(acceptfd, ANSWER_RECEIVER_R_IMAGE, strlen(ANSWER_RECEIVER_R_IMAGE), (struct sockaddr *) &claddr, len);
-
-    if (resultWrite == -1) {
-      fprintf(stderr, "%s\n", buf);
-    }
-
-    // sendResultServer(acceptfd, R_IMAGE, ANSWER_RECEIVER_R_IMAGE, resultWrite, clients);
-
-    pthread_mutex_lock(&lock);
-    *sendDefaultMessage = false;
-    pthread_mutex_unlock(&lock);
-  }
-
-}
-
-void takecall(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-
-  if (strcmp(buf, TAKE_CALL) == 0) {
-    int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_TAKE_CALL);
-    sendResultServer(acceptfd, TAKE_CALL, ANSWER_RECEIVER_TAKE_CALL, resultWrite, clients);
-    pthread_mutex_lock(&lock);
-    *sendDefaultMessage = false;
-    pthread_mutex_unlock(&lock);
-  }
-
-}
-
-void recaudio(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-
-  if (strcmp(buf, R_AUDIO) == 0) {
-    int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_REC_AUDIO);
-    sendResultServer(acceptfd, R_AUDIO, ANSWER_RECEIVER_REC_AUDIO, resultWrite, clients);
-    pthread_mutex_lock(&lock);
-    *sendDefaultMessage = false;
-    pthread_mutex_unlock(&lock);
-  }
-
-}
-
-void id(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-
-  if (strcmp(buf, ID) == 0) {
-    char destiny[BUF_SIZE] = ANSWER_SENDER_ID;
-    char source[BUF_SIZE];
-
-    /*
-     * Elimina la basura que haya en este bufer ya que
-     * al crearlo no es inicializado, con lo cual es
-     * probable que contenga datos basura
-     */
-    resetCharArray(source);
-
-    int idDepartment = getIdDepartment(clients, acceptfd);
-
-    /*
-     * Convierte entero a caracter
-     */
-    source[0] = idDepartment + '0';
-
-    /*
-     * Agrega \n para tener un salto de linea
-     */
-    source[1] = '\n';
-
-    /*
-     * Concatena el contenido de ambos arreglos
-     * de char y el resultado lo coloca en el primer
-     * arreglo de char que se pasa como argumento
-     */
-    strcat(destiny, source);
-
-    int resultWrite = sendResultClient(acceptfd, destiny);
-    sendResultServer(acceptfd, ID, destiny, resultWrite, clients);
-    pthread_mutex_lock(&lock);
-    *sendDefaultMessage = false;
-    pthread_mutex_unlock(&lock);
-  }
-
-}
-
-void ping(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-
-  if (strcmp(buf, PING) == 0) {
-    int resultWrite = sendResultClient(acceptfd, ANSWER_SENDER_PING);
-    sendResultServer(acceptfd, PING, ANSWER_SENDER_PING, resultWrite, clients);
-    pthread_mutex_lock(&lock);
-    *sendDefaultMessage = false;
-    pthread_mutex_unlock(&lock);
-  }
-
-}
-
-void disconnect(int acceptfd,  bool* sendDefaultMessage, bool* disconnection, const char* buf, int *amountConnections, pthread_mutex_t lock, int clients[]) {
-
-  if (strcmp(buf, EXIT) == 0) {
-    int resultWrite = sendResultClient(acceptfd, ANSWER_SENDER_EXIT);
-    sendResultServer(acceptfd, EXIT, ANSWER_SENDER_EXIT, resultWrite, clients);
-
-    pthread_mutex_lock(&lock);
-    removeClient(clients, acceptfd, amountConnections);
-    *sendDefaultMessage = false;
-    *disconnection = true;
-    pthread_mutex_unlock(&lock);
-
-    close(acceptfd);
-    printConnections(amountConnections);
-  }
-
-}
-
+/*
+ * Comandos para la transmision y recepcion de imagenes
+ */
 void simage(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
 
   if (strcmp(nameCommandBuf, S_IMAGE) == 0) {
@@ -250,6 +136,33 @@ void simage(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
 
 }
 
+void rimage(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
+
+  if (strcmp(buf, R_IMAGE) == 0) {
+    int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_R_IMAGE);
+    sendResultServer(acceptfd, R_IMAGE, ANSWER_RECEIVER_R_IMAGE, resultWrite, clients);
+    pthread_mutex_lock(&lock);
+    *sendDefaultMessage = false;
+    pthread_mutex_unlock(&lock);
+  }
+
+}
+
+/*
+ * Comandos para la emision y recepcion de llamadas
+ */
+void takecall(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
+
+  if (strcmp(buf, TAKE_CALL) == 0) {
+    int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_TAKE_CALL);
+    sendResultServer(acceptfd, TAKE_CALL, ANSWER_RECEIVER_TAKE_CALL, resultWrite, clients);
+    pthread_mutex_lock(&lock);
+    *sendDefaultMessage = false;
+    pthread_mutex_unlock(&lock);
+  }
+
+}
+
 void callto(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
 
   if (strcmp(nameCommandBuf, CALL_TO) == 0) {
@@ -297,6 +210,9 @@ void callto(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
 
 }
 
+/*
+ * Comandos para la transmision y recepcion de audio
+ */
 void sendaudio(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
 
   if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
@@ -340,6 +256,92 @@ void sendaudio(int senderfd, bool* sendDefaultMessage, const char* nameCommandBu
     // TODO: Documentar
     resultWrite = sendResultClient(senderfd, ANSWER_SENDER_SEND_AUDIO);
     sendResultServer(senderfd, S_AUDIO, ANSWER_SENDER_SEND_AUDIO, resultWrite, clients);
+  }
+
+}
+
+void recaudio(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
+
+  if (strcmp(buf, R_AUDIO) == 0) {
+    int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_REC_AUDIO);
+    sendResultServer(acceptfd, R_AUDIO, ANSWER_RECEIVER_REC_AUDIO, resultWrite, clients);
+    pthread_mutex_lock(&lock);
+    *sendDefaultMessage = false;
+    pthread_mutex_unlock(&lock);
+  }
+
+}
+
+/*
+ * Otros comandos
+ */
+ void id(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
+
+   if (strcmp(buf, ID) == 0) {
+     char destiny[BUF_SIZE] = ANSWER_SENDER_ID;
+     char source[BUF_SIZE];
+
+     /*
+      * Elimina la basura que haya en este bufer ya que
+      * al crearlo no es inicializado, con lo cual es
+      * probable que contenga datos basura
+      */
+     resetCharArray(source);
+
+     int idDepartment = getIdDepartment(clients, acceptfd);
+
+     /*
+      * Convierte entero a caracter
+      */
+     source[0] = idDepartment + '0';
+
+     /*
+      * Agrega \n para tener un salto de linea
+      */
+     source[1] = '\n';
+
+     /*
+      * Concatena el contenido de ambos arreglos
+      * de char y el resultado lo coloca en el primer
+      * arreglo de char que se pasa como argumento
+      */
+     strcat(destiny, source);
+
+     int resultWrite = sendResultClient(acceptfd, destiny);
+     sendResultServer(acceptfd, ID, destiny, resultWrite, clients);
+     pthread_mutex_lock(&lock);
+     *sendDefaultMessage = false;
+     pthread_mutex_unlock(&lock);
+   }
+
+ }
+
+void ping(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
+
+  if (strcmp(buf, PING) == 0) {
+    int resultWrite = sendResultClient(acceptfd, ANSWER_SENDER_PING);
+    sendResultServer(acceptfd, PING, ANSWER_SENDER_PING, resultWrite, clients);
+    pthread_mutex_lock(&lock);
+    *sendDefaultMessage = false;
+    pthread_mutex_unlock(&lock);
+  }
+
+}
+
+void disconnect(int acceptfd,  bool* sendDefaultMessage, bool* disconnection, const char* buf, int *amountConnections, pthread_mutex_t lock, int clients[]) {
+
+  if (strcmp(buf, EXIT) == 0) {
+    int resultWrite = sendResultClient(acceptfd, ANSWER_SENDER_EXIT);
+    sendResultServer(acceptfd, EXIT, ANSWER_SENDER_EXIT, resultWrite, clients);
+
+    pthread_mutex_lock(&lock);
+    removeClient(clients, acceptfd, amountConnections);
+    *sendDefaultMessage = false;
+    *disconnection = true;
+    pthread_mutex_unlock(&lock);
+
+    close(acceptfd);
+    printConnections(amountConnections);
   }
 
 }
