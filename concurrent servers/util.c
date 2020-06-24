@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include "utildefinitions.h"
 #include "answers.h"
+#include "confirmations.h"
 
 // TODO: Documentar lo que falte documentar
 

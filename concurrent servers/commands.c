@@ -4,10 +4,13 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
 #include "answers.h"
 #include "namecommands.h"
 #include "utildefinitions.h"
 #include "commandsdefinitions.h"
+#include "confirmations.h"
+#include "notices.h"
 
 // TODO: Documentar lo que haga falta documentar
 
@@ -72,6 +75,10 @@ void simage(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
 
   if (strcmp(nameCommandBuf, S_IMAGE) == 0) {
     int resultWrite;
+    int numRead;
+
+    FILE* newFile = NULL;
+    char buf[BUF_SIZE];
 
     pthread_mutex_lock(&lock);
     *sendDefaultMessage = false;
@@ -113,12 +120,106 @@ void simage(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
       return;
     }
 
-    // TODO: Modificar
-    int senderDepartmentId = getIdDepartment(clients, senderfd);
-    int receiverfd = clients[destinyDepartmentId - 1];
+    /*
+     * Se muestra en el servidor el cliente que ejecuto el comando simage
+     */
+    sendResultServer(senderfd, S_IMAGE, ANSWER_SENDER_S_IMAGE, resultWrite, clients);
 
-    char notification[BUF_SIZE];
-    concatenateTextNotification(notification, IMAGE_NOTICE_TO_RECEIVER_FIRST_PART, IMAGE_NOTICE_TO_RECEIVER_SECOND_PART, senderDepartmentId);
+    /*
+     * Se crea un archivo para copiar el contenido del archivo que
+     * un cliente quiere enviar a otro cliente
+     */
+    // newFile = fopen("newFile.txt", "w");
+
+    // printf("%s\n", "ANTES DE ENVIAR EL AVISO");
+
+    /*
+     * Se le avisa al cliente receptor que hay un cliente emisor
+     * que le quiere enviar un archivo
+     */
+    int receiverfd = clients[destinyDepartmentId - 1];
+    sendNoticeReceiver(receiverfd, destinyDepartmentId, FILE_SEND_NOTIFICATION);
+
+    /*
+     * Se confirma al cliente emisor que el cliente receptor esta disponible para
+     * la transmision del archivo usado en el comando simage
+     */
+    resultWrite = write(senderfd, AVAILABLE_CUSTOMER_CONFIRMATION, strlen(AVAILABLE_CUSTOMER_CONFIRMATION) + 1);
+
+    if (resultWrite == -1) {
+      perror("write");
+      exit(EXIT_FAILURE);
+    }
+
+    // while ((numRead = read(senderfd, buf, BUF_SIZE)) > 0) {
+    //
+    //   if (strcmp(buf, EOF_CONFIRMATION) != 0) {
+    //     fputs(buf, newFile);
+    //   }
+    //
+    //   if (strcmp(buf, EOF_CONFIRMATION) == 0) {
+    //     break;
+    //   }
+    //
+    // }
+
+    /*
+     * Se cierra el archivo previamente abierto
+     */
+    // fclose(newFile);
+    // printf("%s\n", "DESPUES DEL WHILE");
+
+    /*
+     * Se le avisa al cliente receptor que alguien le quiere enviar un archivo
+     */
+    // int receiverfd = clients[destinyDepartmentId - 1];
+    // resultWrite = write(receiverfd, FILE_SEND_NOTIFICATION, strlen(FILE_SEND_NOTIFICATION) + 1);
+    //
+    // if (resultWrite == -1) {
+    //   perror("write");
+    //   exit(EXIT_FAILURE);
+    // }
+
+    // printf("%s\n", "ENTRO");
+
+    /*
+     * Si el flujo de ejecucion del programa llega hasta aca
+     * es porque ya esta todo listo para que el cliente emisor
+     * envie al servidor el archivo, y su vez que este ultimo
+     * le envie al cliente receptor el archivo
+     */
+    while ((numRead = read(senderfd, buf, BUF_SIZE)) > 0) {
+      printf("%s\n", buf);
+
+      resultWrite = write(receiverfd, buf, strlen(buf) + 1);
+
+      if (resultWrite == -1) {
+        perror("write");
+        exit(EXIT_FAILURE);
+      }
+
+
+      if (strcmp(buf, EOF_CONFIRMATION) == 0) {
+        resultWrite = write(receiverfd, EOF_CONFIRMATION, strlen(EOF_CONFIRMATION) + 1);
+
+        if (resultWrite == -1) {
+          perror("write");
+          exit(EXIT_FAILURE);
+        }
+
+        break;
+      }
+
+    } // End while
+
+    printf("%s\n", "SERVIDOR TERMINO LA TRANSFERENCIA DEL ARCHIVO");
+
+    // TODO: Modificar
+    // int senderDepartmentId = getIdDepartment(clients, senderfd);
+    // int receiverfd = clients[destinyDepartmentId - 1];
+
+    // char notification[BUF_SIZE];
+    // concatenateTextNotification(notification, IMAGE_NOTICE_TO_RECEIVER_FIRST_PART, IMAGE_NOTICE_TO_RECEIVER_SECOND_PART, senderDepartmentId);
 
     /*
      * Si el flujo de ejecucion llega hasta aca, es porque el
@@ -127,11 +228,11 @@ void simage(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
      * cliente receptor se le tiene que enviar un aviso de
      * que alguien le envio una imagen
      */
-    sendNoticeReceiver(receiverfd, destinyDepartmentId, notification);
+    // sendNoticeReceiver(receiverfd, destinyDepartmentId, notification);
 
     // TODO: Documentar
-    resultWrite = sendResultClient(senderfd, ANSWER_SENDER_S_IMAGE);
-    sendResultServer(senderfd, S_IMAGE, ANSWER_SENDER_S_IMAGE, resultWrite, clients);
+    // resultWrite = sendResultClient(senderfd, ANSWER_SENDER_S_IMAGE);
+    // sendResultServer(senderfd, S_IMAGE, ANSWER_SENDER_S_IMAGE, resultWrite, clients);
   }
 
 }

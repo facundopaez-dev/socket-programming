@@ -232,19 +232,19 @@ void *handleRequest(void *args) {
      * Comandos: Audio, llamada
      */
     if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
-      sendaudio(socketudpfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+      sendaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
     }
 
     if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
-      recaudio(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    }
-
-    if (strcmp(nameCommandBuf, TAKE_CALL) == 0) {
-      takecall(socketudpfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+      recaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
     }
 
     if (strcmp(nameCommandBuf, CALL_TO) == 0 ) {
-      callto(socketudpfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+      callto(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+    }
+
+    if (strcmp(nameCommandBuf, TAKE_CALL) == 0) {
+      takecall(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
     }
 
     // Ejecucion de cada comando
