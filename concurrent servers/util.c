@@ -6,14 +6,28 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
-#include "utildefinitions.h"
-#include "answers.h"
-#include "confirmations.h"
+#include "headers/answers.h"
+#include "headers/utildefinitions.h"
 
 // TODO: Documentar lo que falte documentar
 
-int sendResultClientUdp(int acceptfd, char* answer, int numRead, const struct sockaddr *claddr, socklen_t len) {
-  return sendto(acceptfd, answer, numRead, 0, claddr, len);
+// int sendResultClientUdp(int fd, char* answer, int numRead, const struct sockaddr *claddr, socklen_t len) {
+int sendResultClientUdp(int fd, char* answer) {
+  socklen_t len;
+  struct sockaddr_storage claddr;
+
+  len = sizeof(struct sockaddr_storage);
+
+  char buf[BUF_SIZE];
+
+  int resultSend = sendto(fd, buf, BUF_SIZE, 0, (struct sockaddr *) &claddr, len);
+
+  if (resultSend == -1) {
+    perror("send");
+    exit(EXIT_FAILURE);
+  }
+
+  return resultSend;
 }
 
 int sendResultClient(int acceptfd, char* answer) {
@@ -24,15 +38,15 @@ void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite
 
   if (resultWrite >= 0) {
     int senderDepartmentId = getIdDepartment(clients, acceptfd);
-    printf("The client of the department %i executes the command: %s\n", senderDepartmentId, command);
-    printf("Response: %s\n", answer);
+    printf("[SERVER] The client of the department %i executes the command: %s\n", senderDepartmentId, command);
+    printf("[SERVER] Response to client: %s\n", answer);
   }
 
 }
 
 void sendNoticeReceiver(int acceptfd, int receivingDepartmentId, char* notice) {
   if (write(acceptfd, notice, strlen(notice) + 1) >= 0) {
-    printf("Notification for customer %i: %s\n", receivingDepartmentId, notice);
+    printf("[SERVER] Notification for customer %i: %s\n", receivingDepartmentId, notice);
   }
 }
 
@@ -44,9 +58,9 @@ void responseInvalidCommand(int acceptfd, char* answer, char* invalidCommand, in
 
   if (write(acceptfd, answer, strlen(answer) + 1) >= 0) {
     int senderDepartmentId = getIdDepartment(clients, acceptfd);
-    printf("The client of the department %i executes an invalid command\n", senderDepartmentId);
-    printf("Invalid command: %s\n", invalidCommand);
-    printf("Response: %s\n", answer);
+    printf("[SERVER] The client of the department %i executes an invalid command\n", senderDepartmentId);
+    printf("[SERVER] Invalid command: %s\n", invalidCommand);
+    printf("[SERVER] Response to client: %s\n", answer);
   }
 
 }
@@ -104,7 +118,7 @@ bool equalDepartment(int senderfd, int idDepartment, int clients[]) {
 }
 
 void printConnections(int *amountConnections) {
-  printf("%s%i\n", "Ammount connections: ", *amountConnections);
+  printf("%s%i\n", "[SERVER] Ammount connections: ", *amountConnections);
 }
 
 /**
@@ -312,14 +326,18 @@ int getFdSocketUdp(int acceptfd) {
   int socketudpfd;
   int bindudpfd;
 
-  struct sockaddr sudpaddr;
+  struct sockaddr_in sudpaddr;
   socklen_t udpaddrlen = sizeof(sudpaddr);
 
   /*
    * La funcion getsockname carga una struct sockaddr
    * con la IP y el puerto del servidor
    */
-  getsockname(acceptfd, &sudpaddr, &udpaddrlen);
+  getsockname(acceptfd, (struct sockaddr *) &sudpaddr, &udpaddrlen);
+
+  // printf("%s\n", "[SERVER] UDP data");
+  // printf("[SERVER] Port: %d\n", ntohs(sudpaddr.sin_port));
+  // printf("[SERVER] IP adress: %s\n", inet_ntoa(sudpaddr.sin_addr));
 
   /*
    * AF_INET y SOCK_DGRAM indican que este socket

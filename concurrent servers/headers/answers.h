@@ -15,14 +15,6 @@
 #define ANSWER_RECEIVER_TAKE_CALL "call taken\n"
 #define ANSWER_RECEIVER_REC_AUDIO "audio received\n"
 
-// Avisos para los receptores
-#define IMAGE_NOTICE_TO_RECEIVER_FIRST_PART "the client of the department "
-#define IMAGE_NOTICE_TO_RECEIVER_SECOND_PART " sent you an image\n"
-#define CALL_NOTICE_TO_RECEIVER_FIRST_PART "the client of the department "
-#define CALL_NOTICE_TO_RECEIVER_SECOND_PART " is calling you\n"
-#define AUDIO_NOTICE_TO_RECEIVER_FIRST_PART "the client of the department "
-#define AUDIO_NOTICE_TO_RECEIVER_SECOND_PART " sent you an audio\n"
-
 // Respuestas generales
 #define ANSWER_INVALID_COMMAND "Invalid command\n"
 #define ANSWER_LIMIT_CONNECTIONS "Connection limit reached, try again later\n"
