@@ -5,12 +5,16 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <pthread.h>
+
+// Headers
 #include "headers/answers.h"
 #include "headers/commandsdefinitions.h"
 #include "headers/modes.h"
 #include "headers/namecommands.h"
 #include "headers/notices.h"
 #include "headers/utildefinitions.h"
+
+// Constants
 #define IP "127.0.0.1"
 #define PORT "50001"
 
@@ -86,8 +90,6 @@ int main(int argc, char *argv[]) {
   struct structparams params;
 
   for (;;) {
-    // printf("%s%i\n", "**", amountConnections);
-
     /*
      * Si la cantidad de conexiones es menor que el limite
      * de conexiones, entonces el servidor acepta una nueva
@@ -97,14 +99,10 @@ int main(int argc, char *argv[]) {
       acceptFd = accept(socketTcpFd, NULL, NULL); /* Wait for connection */
       socketUdpFd = getFdSocketUdp(acceptFd);
 
-      // printf("[SERVER] UDP socket's number: %d\n", socketUdpFd);
-
       if (acceptFd == -1) {
         perror("Accept error: Could not accept");
         exit(EXIT_FAILURE);
       }
-
-      // printf("%s%i\n", "Cantidad de conexiones: ", amountConnections);
 
       params.acceptFd = acceptFd;
       params.socketUdpFd = socketUdpFd;
@@ -271,7 +269,10 @@ void *handleRequest(void *args) {
       printf("[SERVER] UDP socket's number: %d\n", socketUdpFd);
       printf("%s\n", "");
 
-      // Obtiene los datos del servidor asociados al socket UDP
+      /*
+       * Obtiene los datos del servidor asociados al socket
+       * UDP creado previamente
+       */
       int resultGetSockName = getsockname(socketUdpFd, (struct sockaddr *) &addr, &len);
 
       printf("%s\n", "[SERVER] Data server send to client");
@@ -294,31 +295,6 @@ void *handleRequest(void *args) {
         perror("write");
         exit(EXIT_FAILURE);
       }
-
-      // char intbuf[BUF_SIZE];
-      // char n = socketUdpFd + '0';
-      // strcpy(intbuf, &n);
-      //
-      // write(acceptFd, intbuf, strlen(intbuf) + 1);
-
-
-      /*
-       * Esto suprime el \n de la cadena enviada por el cliente
-       * haciendo que las cadenas de texto que son iguales no
-       * den como resultado (por la funcion strcmp) que son
-       * diferentes
-       */
-      // buf[numRead - 1] = '\0';
-
-      /*
-       * Separa el nombre del comando del argumento, el cual
-       * es el ID de un departamento
-       *
-       * Hay que recordar que el ID de un departamento en el
-       * arreglo de conexiones es una celda del arreglo, y
-       * por ende, es el indice de esa celda
-       */
-      // sscanf(buf, "%s%i", nameCommandBuf, &idDepartment);
 
       /*
        * Si el comando es para UDP, se tiene que ejecutar
@@ -346,100 +322,6 @@ void *handleRequest(void *args) {
     // Retornar el mensaje de comando invalido
     // y mostrar en el servidor la cadena de texto
     // que es un comando invalido
-
-    /*
-     * Separa el nombre del comando del argumento, el cual
-     * es el ID de un departamento
-     *
-     * Hay que recordar que el ID de un departamento en el
-     * arreglo de conexiones es una celda del arreglo, y
-     * por ende, es el indice de esa celda
-     */
-    // sscanf(buf, "%s%i", nameCommandBuf, &idDepartment);
-
-    /*
-     * Si el comando es para TCP, se tiene que ejecutar
-     * haciendo uso del protocolo TCP
-     *
-     * Comandos: Luces, riego, imagen, desconexion,
-     * ping y id
-     */
-    // if (strcmp(nameCommandBuf, TURN_ON) == 0) {
-    //   turnon(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-    //
-    // if(strcmp(nameCommandBuf, TURN_OFF) == 0) {
-    //   turnoff(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-    //
-    // if(strcmp(nameCommandBuf, I_ENABLE) == 0) {
-    //   ienable(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-    //
-    // if(strcmp(nameCommandBuf, I_DISABLE) == 0) {
-    //   idisable(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-    //
-    // if (strcmp(nameCommandBuf, S_IMAGE) == 0) {
-    //   simage(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
-    // }
-    //
-    // if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
-    //   rimage(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-    //
-    // if(strcmp(nameCommandBuf, EXIT) == 0) {
-    //   disconnect(acceptfd, &sendDefaultMessage, &disconnection, nameCommandBuf, params -> amountConnections, lock, clients);
-    // }
-    //
-    // if(strcmp(nameCommandBuf, PING) == 0) {
-    //   ping(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-    //
-    // if(strcmp(nameCommandBuf, ID) == 0) {
-    //   id(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-
-    /*
-     * Si el comando es para UDP, se tiene que ejecutar
-     * haciendo uso del protocolo UDP
-     *
-     * Comandos: Audio, llamada
-     */
-    // if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
-    //   sendaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
-    // }
-    //
-    // if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
-    //   recaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-    //
-    // if (strcmp(nameCommandBuf, CALL_TO) == 0 ) {
-    //   callto(acceptfd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
-    // }
-    //
-    // if (strcmp(nameCommandBuf, TAKE_CALL) == 0) {
-    //   takecall(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-    // }
-
-    // pthread_mutex_lock(&lock);
-    // if (sendDefaultMessage) {
-    //   invalidCommand(acceptfd, buf, clients);
-    // }
-    //
-    // if (!sendDefaultMessage) {
-      /*
-       * Cuando esta variable tiene el valor falso
-       * tiene que ser reiniciada al valor verdadero,
-       * en caso de no hacerlo se tendra un error
-       * logico y el programa fallara en su funcionamiento
-       *
-       * sendDefaultMessage es asignada con el valor falso
-       * por la ejecucion de los comandos, y es inicializada
-       * con el valor falso antes de la ejecucion del ciclo
-       */
-      // sendDefaultMessage = true;
-    // }
 
     pthread_mutex_lock(&lock);
 

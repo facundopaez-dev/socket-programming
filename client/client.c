@@ -6,12 +6,20 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+
+// Headers
 #include "headers/utildefinitions.h"
 #include "../concurrent servers/headers/answers.h"
 #include "../concurrent servers/headers/namecommands.h"
-#include "../concurrent servers/headers/confirmations.h"
 #include "../concurrent servers/headers/modes.h"
 #include "../concurrent servers/headers/notices.h"
+
+// Constants
+#define FILE_NAME "M101_hires_STScI-PRC2006-10a.jpg"
 #define IP "127.0.0.1"
 #define PORT "50001"
 
@@ -82,9 +90,6 @@ int main(int argc, char *argv[]) {
 void *sendRequest(void *args) {
   struct structparams *params = (struct structparams *) args;
 
-  // struct sockaddr_storage claddr;
-  // socklen_t len;
-
   int numRead;
   int numWrite;
   int idDepartment;
@@ -143,6 +148,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(TURN_ON, sendBuffer);
 
+      /*
+       * El cliente le envia el comando turnon al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -153,6 +162,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(TURN_OFF, sendBuffer);
 
+      /*
+       * El cliente le envia el comando turnoff al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -163,6 +176,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(I_ENABLE, sendBuffer);
 
+      /*
+       * El cliente le envia el comando ienable al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -173,6 +190,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(I_DISABLE, sendBuffer);
 
+      /*
+       * El cliente le envia el comando idisable al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -183,9 +204,86 @@ void *sendRequest(void *args) {
 
       displayDataSent(S_IMAGE, sendBuffer);
 
+      /*
+       * El cliente le envia el comando simage al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
+
+      /*
+       * Pasos para transferir un archivo al servidor
+       * 1. Abrir el archivo a enviar
+       * 2. Determinar su tamaño
+       * 3. Enviar al servidor el tamaño del archivo abierto
+       * 2. Enviar el archivo
+       */
+      int fileFd = open(FILE_NAME, O_RDONLY);
+
+      if (fileFd == -1) {
+        perror("open");
+        exit(EXIT_FAILURE);
+      } else {
+        printf("[CLIENT] %s\n", "Open image file");
+      }
+
+      off_t fileSize;
+      struct stat fileInfo;
+
+      /*
+       * Obtiene la informacion del archivo asociado
+       * al descriptor de archivo que se pasa como
+       * primer argumento, y coloca dicha informacion
+       * en la estructura fileInfo
+       */
+      fstat(fileFd, &fileInfo);
+      fileSize = htonl(fileInfo.st_size);
+
+      /*
+       * El cliente le envia al servidor, con el cual esta
+       * conectado, el tamaño del archivo abierto
+       */
+      int resultSend = send(socketTcpFd, (void *) &fileSize, sizeof(fileSize), 0);
+
+      if (resultSend == -1) {
+        perror("send");
+        exit(EXIT_FAILURE);
+      }
+
+      int bytesSended = 1;
+      int resultSendFile;
+
+      printf("[CLIENT SENDER] st_size: %ld\n", fileInfo.st_size);
+
+      /*
+       * El cliente le envia el archivo, previamente
+       * abierto, al servidor con el que esta conectado
+       */
+      while (bytesSended > 0) {
+        resultSendFile = sendfile(socketTcpFd, fileFd, NULL, BUF_SIZE);
+
+        if (resultSendFile == -1) {
+          perror("sendfile");
+          exit(EXIT_FAILURE);
+        }
+
+        printf("Bytes sended: %d\n", bytesSended);
+        // printf("File size: %ld\n", fileSize);
+        printf("resultSendFile: %d\n", resultSendFile);
+        printf("%s\n", "ENTRO");
+        bytesSended = resultSendFile;
+      }
+
+      // int bs, scount = 0;
+      // while ((bs = sendfile(socketTcpFd, fileFd, NULL, BUF_SIZE)) > 0) {
+      //     scount += bs;
+      //     printf("sended %d bytes ...\n", bs);
+      // }
+
+      printf("%s\n", "[CLIENT] file sended successfully");
+
+      close(fileFd);
       sendInvalidCommand = false;
-    }
+    } // End if simage
 
     if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
       strcat(sendBuffer, FIELD_TCP);
@@ -193,6 +291,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(R_IMAGE, sendBuffer);
 
+      /*
+       * El cliente le envia el comando rimage al servidor con el
+       * que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -203,6 +305,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(EXIT, sendBuffer);
 
+      /*
+       * El cliente le envia el comando exit al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
       exit(EXIT_SUCCESS);
@@ -214,6 +320,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(PING, sendBuffer);
 
+      /*
+       * El cliente le envia el comando ping al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -224,6 +334,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(ID, sendBuffer);
 
+      /*
+       * El cliente le envia el comando id al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -234,6 +348,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(CALL_TO, sendBuffer);
 
+      /*
+       * El cliente le envia el comando callto al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -244,6 +362,10 @@ void *sendRequest(void *args) {
 
       displayDataSent(TAKE_CALL, sendBuffer);
 
+      /*
+       * El cliente le envia el comando takecall al servidor con
+       * el que esta conectado
+       */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
       sendInvalidCommand = false;
     }
@@ -255,73 +377,61 @@ void *sendRequest(void *args) {
      * Comandos: Audio
      */
     if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
-      int numRead;
-
       strcat(sendBuffer, FIELD_UDP);
       strcat(sendBuffer, inputBuffer);
 
       displayDataSent(S_AUDIO, sendBuffer);
 
       /*
-       * El cliente le envia el comando sendaudio al servidor
+       * El cliente le envia el comando sendaudio al servidor con el
+       * que esta conectado
        */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
 
+      /*
+       * Pasos para conectar el socket UDP del cliente con
+       * el socket UDP del servidor
+       *
+       * 1. Recibir los datos del servidor, estos son su
+       * puerto y su direccion IP
+       * 2. Cargar una estructura sockaddr_in con los datos
+       * del servidor
+       * 3. Luego, utilizar la estructura de tipo sockaddr_in
+       * en la llamada al sistema sendto
+       */
       socklen_t len;
       struct sockaddr_in addr;
-      void *buffer;
 
       /*
-       * El cliente recibe los datos del servidor asociados a su
-       * socket UDP
+       * El cliente recibe los datos del servidor asociados al socket
+       * UDP del mismo, los cuales son la direccion IP y el puerto
        */
       numRead = read(socketTcpFd, (void *) &addr, sizeof(addr));
-      // addr = (struct sockaddr) buffer;
 
       printf("%s\n", "");
       printf("%s\n", "[CLIENT] UDP data");
       printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
       printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
 
-      // struct sockaddr_storage claddr;
-
-      // Recibir del servidor sus datos
-      // completar estructura addr con los datos del servidor
-      // luego usarla con sendto
-
-      // int resultPeerName = getpeername(socketUdpFd, &addr, &len);
-      //
-      // if (resultPeerName == -1) {
-      //   perror("getpeername");
-      //   exit(EXIT_FAILURE);
-      // }
-
-      char buf[BUF_SIZE];
-
-      /* Recibe datagramas y retorna copias a los emisores */
+      /*
+       * Recibe lo que se ingresa por teclado y lo envia al
+       * servidor con el que esta conectado
+       */
       for (;;) {
-        numRead = read(0, buf, BUF_SIZE);
+        numRead = read(0, sendBuffer, BUF_SIZE);
 
-        len = sizeof(struct sockaddr);
-        // len = sizeof(struct sockaddr_storage);
-        // printf("%s\n", "ENTRO");
-        // numRead = recvfrom(socketUdpFd, buf, BUF_SIZE, 0, (struct sockaddr *) &claddr, &len);
-        // printf("%s\n", buf);
+        len = sizeof(addr);
 
         if (numRead == -1) {
-          fprintf(stderr, "%s\n", buf);
+          fprintf(stderr, "%s\n", sendBuffer);
         }
 
-        // if (sendto(socketUdpFd, buf, numRead, 0, (struct sockaddr *) &claddr, len) != numRead) {
-        if (sendto(socketUdpFd, buf, numRead, 0, (struct sockaddr *) &addr, len) != numRead) {
-          fprintf(stderr, "%s\n", buf);
+        if (sendto(socketUdpFd, sendBuffer, numRead, 0, (struct sockaddr *) &addr, len) != numRead) {
+          fprintf(stderr, "%s\n", sendBuffer);
         }
 
       }
 
-      // len = sizeof(struct sockaddr_storage);
-      // sendto(socketUdpFd, inputBuffer, numRead, 0, (struct sockaddr *) &claddr, len);
-      // write(socketTcpFd, TCP_MODE, strlen(TCP_MODE) + 1);
       sendInvalidCommand = false;
     }
 
@@ -369,18 +479,112 @@ void *receiveTcpResponse(void *args) {
 
   int numRead;
   int socketTcpFd = params -> socketTcpFd;
+  int resultRecv;
 
   char outputBuffer[BUF_SIZE];
 
   for(;;) {
     numRead = read(socketTcpFd, outputBuffer, BUF_SIZE);
 
+    printf("[CLIENT RECEIVER] numRead: %d\n", numRead);
+
     if (numRead == -1) {
       perror("read");
       exit(EXIT_FAILURE);
     }
 
-    printf("[CLIENT] Response from server: %s\n", outputBuffer);
+    if (strcmp(outputBuffer, S_IMAGE) == 0) {
+      printf("%s\n", "ENTRO A S_IMAGE");
+      off_t fileSize;
+
+      // Lee el tamaño del archivo a recibir
+      resultRecv = recv(socketTcpFd, &fileSize, sizeof(fileSize), 0);
+
+      if (resultRecv == -1) {
+        perror("recv");
+        exit(EXIT_FAILURE);
+      }
+
+      fileSize = ntohl(fileSize);
+
+      printf("[CLIENT RECEIVER] File size: %ld\n", fileSize);
+
+      char buffer[BUF_SIZE];
+      char fileName[BUF_SIZE] = "image.jpg";
+      char end[BUF_SIZE] = "END_IMAGE";
+
+      int bytesReceived = 0;
+      int flags = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
+      int fileFd = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, flags);
+
+      printf("%s\n", "ANTES DE ENTRAR EN EL WHILE");
+
+      while (bytesReceived < fileSize) {
+        resultRecv = recv(socketTcpFd, buffer, BUF_SIZE, 0);
+
+        if (resultRecv == -1) {
+          perror("recv");
+          exit(EXIT_FAILURE);
+        }
+
+        if (resultRecv == 0) {
+          perror("0");
+          exit(EXIT_FAILURE);
+        }
+
+        printf("%d\n", bytesReceived);
+        printf("%d\n", resultRecv);
+        printf("%s\n", "ENTRO");
+        // printf("CONTENIDO DE buffer: %s\n", buffer);
+
+        // if (strcmp(buffer, end) == 0) {
+        //   printf("%s\n", "ENTRO EN IF (buffer == end)");
+        //   break;
+        // }
+
+        write(fileFd, buffer, resultRecv);
+        bytesReceived += resultRecv;
+
+        // if (bytesReceived == fileSize) {
+        //   break;
+        // }
+
+      } // End while
+
+      resetBuffer(outputBuffer);
+
+      printf("%s\n", "SALIO DEL WHILE");
+
+      // while (bytesReceived != fileSize) {
+      //   printf("%s\n", "ENTRO EN EL WHILE");
+      //   resultRecv = recv(socketTcpFd, buffer, BUF_SIZE, 0);
+      //
+      //   if (resultRecv == -1) {
+      //     perror("recv");
+      //     exit(EXIT_FAILURE);
+      //   }
+      //
+      //   write(fileFd, buffer, resultRecv);
+      //   bytesReceived += resultRecv;
+      //
+      //   if (bytesReceived == fileSize) {
+      //     printf("%s\n", "ENTRO EN IF bytesReceived == fileSize");
+      //     break;
+      //   }
+      //
+      //   if (strcmp(buffer, end) == 0) {
+      //     printf("%s\n", "ENTRO EN IF buffer == end");
+      //     break;
+      //   }
+      //
+      //   printf("%s\n", "DENTRO DEL WHILE");
+      // }
+
+      close(fileFd);
+      printf("%s\n", "Image file received");
+    }
+
+    printf("[CLIENT][TCP] Response from server: %s\n", outputBuffer);
 
     /*
      * Si se llega al limite de conexiones del servidor, este
@@ -408,18 +612,18 @@ void *receiveUdpResponse(void *args) {
   char outputBuffer[BUF_SIZE];
 
   socklen_t len;
-  struct sockaddr_storage claddr;
+  struct sockaddr_in addr;
 
   for(;;) {
-    len = sizeof(struct sockaddr_storage);
-    numRead = recvfrom(socketUdpFd, outputBuffer, BUF_SIZE, 0, (struct sockaddr *) &claddr, &len);
+    len = sizeof(addr);
+    numRead = recvfrom(socketUdpFd, outputBuffer, BUF_SIZE, 0, (struct sockaddr *) &addr, &len);
 
     if (numRead == -1) {
       perror("read");
       exit(EXIT_FAILURE);
     }
 
-    printf("[CLIENT] Response from server: %s\n", outputBuffer);
+    printf("[CLIENT][UDP] Response from server: %s\n", outputBuffer);
 
     /*
      * Si se llega al limite de conexiones del servidor, este
