@@ -8,8 +8,11 @@ void resetBuffer(char givenBuffer[]) {
 
 }
 
-void displayDataSent(char* command, char* sendBuffer) {
+void displayCommandExecuted(char* command) {
   printf("[CLIENT] Command executed: %s\n", command);
+}
+
+void displayDataSent(char* sendBuffer) {
   printf("[CLIENT] Send buffer content: %s\n", sendBuffer);
 }
 
@@ -89,7 +92,11 @@ int getFdSocketUdp(char* ip, char* port) {
     exit(EXIT_FAILURE);
   }
 
-  // Este no es necesario
+  /*
+   * No es necesario usar la llamada al sistema bind() en
+   * el programa cliente, pero sí lo es en el programa
+   * servidor
+   */
   // bindUdpFd = bind(socketUdpFd, (struct sockaddr*) &addrUdp, addrlenUdp);
   //
   // if (bindUdpFd == -1) {

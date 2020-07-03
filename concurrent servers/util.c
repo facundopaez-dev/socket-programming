@@ -36,7 +36,7 @@ int sendResultClient(int acceptfd, char* answer) {
 
 void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite, int clients[]) {
 
-  if (resultWrite >= 0) {
+  if (resultWrite > 0) {
     int senderDepartmentId = getIdDepartment(clients, acceptfd);
     printf("[SERVER] The client of the department %i executes the command: %s\n", senderDepartmentId, command);
     printf("[SERVER] Response to client: %s\n", answer);
@@ -50,17 +50,16 @@ void sendNoticeReceiver(int acceptfd, int receivingDepartmentId, char* notice) {
   }
 }
 
-void invalidCommand(int acceptfd, char* invalidCommand, int clients[]) {
-  responseInvalidCommand(acceptfd, ANSWER_INVALID_COMMAND, invalidCommand, clients);
+void invalidCommand(int acceptfd, int clients[]) {
+  responseInvalidCommand(acceptfd, clients);
 }
 
-void responseInvalidCommand(int acceptfd, char* answer, char* invalidCommand, int clients[]) {
+void responseInvalidCommand(int acceptfd, int clients[]) {
 
-  if (write(acceptfd, answer, strlen(answer) + 1) >= 0) {
+  if (write(acceptfd, ANSWER_INVALID_COMMAND, BUF_SIZE) >= 0) {
     int senderDepartmentId = getIdDepartment(clients, acceptfd);
     printf("[SERVER] The client of the department %i executes an invalid command\n", senderDepartmentId);
-    printf("[SERVER] Invalid command: %s\n", invalidCommand);
-    printf("[SERVER] Response to client: %s\n", answer);
+    printf("[SERVER] Response to client: %s\n", ANSWER_INVALID_COMMAND);
   }
 
 }

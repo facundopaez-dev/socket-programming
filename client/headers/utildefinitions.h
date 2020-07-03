@@ -6,7 +6,9 @@
 
 void resetBuffer(char givenBuffer[]);
 
-void displayDataSent(char* command, char* sendBuffer);
+void displayCommandExecuted(char* command);
+
+void displayDataSent(char* sendBuffer);
 
 int getFdSocketTcp(char* ip, char* port);
 

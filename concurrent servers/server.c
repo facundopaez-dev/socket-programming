@@ -234,12 +234,8 @@ void *handleRequest(void *args) {
         idisable(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
       }
 
-      if (strcmp(nameCommandBuf, S_IMAGE) == 0) {
-        simage(acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
-      }
-
       if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
-        rimage(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        rimage(acceptFd, &sendDefaultMessage, lock, clients);
       }
 
       if(strcmp(nameCommandBuf, EXIT) == 0) {
@@ -362,7 +358,7 @@ void *handleRequest(void *args) {
     } // End if UDP_MODE
 
     if (strcmp(buf, INVALID_COMMAND_NOTICE) == 0) {
-      invalidCommand(acceptFd, buf, clients);
+      invalidCommand(acceptFd, clients);
     }
 
     // Comprobar la cadena de comando invalido

@@ -12,16 +12,17 @@
 #include <sys/sendfile.h>
 
 // Headers
-#include "headers/utildefinitions.h"
 #include "../concurrent servers/headers/answers.h"
-#include "../concurrent servers/headers/namecommands.h"
+#include "../concurrent servers/headers/confirmations.h"
 #include "../concurrent servers/headers/modes.h"
+#include "../concurrent servers/headers/namecommands.h"
 #include "../concurrent servers/headers/notices.h"
+#include "headers/utildefinitions.h"
 
 // Constants
-#define FILE_NAME "M101_hires_STScI-PRC2006-10a.jpg"
 #define IP "127.0.0.1"
 #define PORT "50001"
+#define FILE_NAME "Pinwheel Galaxy Messier 101.jpg"
 
 pthread_mutex_t lock;
 
@@ -146,7 +147,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(TURN_ON, sendBuffer);
+      displayCommandExecuted(TURN_ON);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando turnon al servidor con
@@ -160,7 +162,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(TURN_OFF, sendBuffer);
+      displayCommandExecuted(TURN_OFF);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando turnoff al servidor con
@@ -174,7 +177,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(I_ENABLE, sendBuffer);
+      displayCommandExecuted(I_ENABLE);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando ienable al servidor con
@@ -188,7 +192,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(I_DISABLE, sendBuffer);
+      displayCommandExecuted(I_DISABLE);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando idisable al servidor con
@@ -198,112 +203,46 @@ void *sendRequest(void *args) {
       sendInvalidCommand = false;
     }
 
-    if (strcmp(nameCommandBuf, S_IMAGE) == 0) {
-      strcat(sendBuffer, FIELD_TCP);
-      strcat(sendBuffer, inputBuffer);
-
-      displayDataSent(S_IMAGE, sendBuffer);
-
-      /*
-       * El cliente le envia el comando simage al servidor con
-       * el que esta conectado
-       */
-      numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
-
-      /*
-       * Pasos para transferir un archivo al servidor
-       * 1. Abrir el archivo a enviar
-       * 2. Determinar su tamaño
-       * 3. Enviar al servidor el tamaño del archivo abierto
-       * 2. Enviar el archivo
-       */
-      int fileFd = open(FILE_NAME, O_RDONLY);
-
-      if (fileFd == -1) {
-        perror("open");
-        exit(EXIT_FAILURE);
-      } else {
-        printf("[CLIENT] %s\n", "Open image file");
-      }
-
-      off_t fileSize;
-      struct stat fileInfo;
-
-      /*
-       * Obtiene la informacion del archivo asociado
-       * al descriptor de archivo que se pasa como
-       * primer argumento, y coloca dicha informacion
-       * en la estructura fileInfo
-       */
-      fstat(fileFd, &fileInfo);
-      fileSize = htonl(fileInfo.st_size);
-
-      /*
-       * El cliente le envia al servidor, con el cual esta
-       * conectado, el tamaño del archivo abierto
-       */
-      int resultSend = send(socketTcpFd, (void *) &fileSize, sizeof(fileSize), 0);
-
-      if (resultSend == -1) {
-        perror("send");
-        exit(EXIT_FAILURE);
-      }
-
-      int bytesSended = 1;
-      int resultSendFile;
-
-      printf("[CLIENT SENDER] st_size: %ld\n", fileInfo.st_size);
-
-      /*
-       * El cliente le envia el archivo, previamente
-       * abierto, al servidor con el que esta conectado
-       */
-      while (bytesSended > 0) {
-        resultSendFile = sendfile(socketTcpFd, fileFd, NULL, BUF_SIZE);
-
-        if (resultSendFile == -1) {
-          perror("sendfile");
-          exit(EXIT_FAILURE);
-        }
-
-        printf("Bytes sended: %d\n", bytesSended);
-        // printf("File size: %ld\n", fileSize);
-        printf("resultSendFile: %d\n", resultSendFile);
-        printf("%s\n", "ENTRO");
-        bytesSended = resultSendFile;
-      }
-
-      // int bs, scount = 0;
-      // while ((bs = sendfile(socketTcpFd, fileFd, NULL, BUF_SIZE)) > 0) {
-      //     scount += bs;
-      //     printf("sended %d bytes ...\n", bs);
-      // }
-
-      printf("%s\n", "[CLIENT] file sended successfully");
-
-      close(fileFd);
-      sendInvalidCommand = false;
-    } // End if simage
-
     if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(R_IMAGE, sendBuffer);
+      displayCommandExecuted(R_IMAGE);
+      displayDataSent(sendBuffer);
 
       /*
-       * El cliente le envia el comando rimage al servidor con el
-       * que esta conectado
+       * Pasos para recibir un archivo de parte del servidor
+       * 1. Solicitar el archivo mediante el comando rimage
+       * 2. Recibir la confirmacion o no de un archivo
+       * existente en el directorio del servidor
+       * 3. Recibir tamaño del archivo
+       * 4. Leer cada byte del archivo enviado por el servidor
+       *
+       * Los pasos 2, 3 y 4 estan comentados en la funcion
+       * receiveTcpResponse()
+       */
+
+      /*
+       * 1. El cliente le envia el comando rimage al servidor con el
+       * que esta conectado, de esta forma le solicita al servidor
+       * un archivo
        */
       numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
+
+      if (numWrite == -1) {
+        perror("write");
+        exit(EXIT_FAILURE);
+      }
+
       sendInvalidCommand = false;
-    }
+    } // End if rimage
 
     if(strcmp(nameCommandBuf, EXIT) == 0) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(EXIT, sendBuffer);
+      displayCommandExecuted(EXIT);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando exit al servidor con
@@ -318,7 +257,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(PING, sendBuffer);
+      displayCommandExecuted(PING);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando ping al servidor con
@@ -332,7 +272,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(ID, sendBuffer);
+      displayCommandExecuted(ID);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando id al servidor con
@@ -346,7 +287,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(CALL_TO, sendBuffer);
+      displayCommandExecuted(CALL_TO);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando callto al servidor con
@@ -360,7 +302,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_TCP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(TAKE_CALL, sendBuffer);
+      displayCommandExecuted(TAKE_CALL);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando takecall al servidor con
@@ -380,7 +323,8 @@ void *sendRequest(void *args) {
       strcat(sendBuffer, FIELD_UDP);
       strcat(sendBuffer, inputBuffer);
 
-      displayDataSent(S_AUDIO, sendBuffer);
+      displayCommandExecuted(S_AUDIO);
+      displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando sendaudio al servidor con el
@@ -451,8 +395,13 @@ void *sendRequest(void *args) {
        * El cliente le envia al servidor el aviso de que se
        * ingreso un comando invalido
        */
-      write(socketTcpFd, INVALID_COMMAND_NOTICE, strlen(INVALID_COMMAND_NOTICE) + 1);
-      numWrite = write(socketTcpFd, inputBuffer, strlen(inputBuffer) + 1);
+      write(socketTcpFd, INVALID_COMMAND_NOTICE, BUF_SIZE);
+
+      /*
+       * El cliente le envia al servidor lo que ingresado
+       * por el teclado es un comando invalido
+       */
+      numWrite = write(socketTcpFd, inputBuffer, BUF_SIZE);
     }
 
     /*
@@ -487,12 +436,88 @@ void *receiveTcpResponse(void *args) {
   for(;;) {
     numRead = read(socketTcpFd, outputBuffer, BUF_SIZE);
 
-    // printf("[CLIENT RECEIVER] numRead: %d\n", numRead);
-
     if (numRead == -1) {
       perror("read");
       exit(EXIT_FAILURE);
     }
+
+    if (strcmp(outputBuffer, S_IMAGE) == 0) {
+      /*
+       * 2. El cliente, en esta linea de codigo fuente, recibe la
+       * confirmacion de parte del servidor de si tiene o no
+       * un archivo para la transferencia
+       */
+      numRead = read(socketTcpFd, outputBuffer, BUF_SIZE);
+
+      if (numRead == -1) {
+        perror("read");
+        exit(EXIT_FAILURE);
+      }
+
+      /*
+       * El cliente comprueba si lo que recibio de parte
+       * del servidor es la confirmacion positiva de la
+       * existencia de un archivo
+       */
+      if (strcmp(outputBuffer, EXISTING_FILE) == 0) {
+        off_t fileSize;
+        char buffer[BUF_SIZE];
+
+        int bytesReceived = 0;
+        int flags = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
+        int fileFd = open(FILE_NAME, O_CREAT | O_TRUNC | O_WRONLY, flags);
+
+        /*
+         * 3. El cliente recibe del servidor el tamaño del archivo
+         * que va a recibir
+         */
+        resultRecv = recv(socketTcpFd, &fileSize, sizeof(fileSize), 0);
+
+        if (resultRecv == -1) {
+          perror("recv");
+          exit(EXIT_FAILURE);
+        }
+
+        fileSize = ntohl(fileSize);
+        printf("[CLIENT][TCP] File size received: %ld\n", fileSize);
+
+        /*
+         * 4. El cliente recibe de parte del servidor los
+         * bytes del archivo, en este parte del codigo fuente
+         * es en donde inicia la transferencia del archivo
+         * desde al servidor a este cliente
+         */
+        while (bytesReceived < fileSize) {
+          resultRecv = recv(socketTcpFd, buffer, BUF_SIZE, 0);
+
+          if (resultRecv == -1) {
+            perror("recv");
+            exit(EXIT_FAILURE);
+          }
+
+          write(fileFd, buffer, resultRecv);
+          bytesReceived += resultRecv;
+
+          if (bytesReceived == fileSize) {
+            break;
+          }
+
+        }
+
+        printf("[CLIENT][TCP] File transfer completed\n", "");
+        close(fileFd);
+      } // Enf if EXISTING_FILE
+
+      /*
+       * El cliente comprueba si lo que recibio de parte
+       * del servidor es la confirmacion negativa de la
+       * existencia de un archivo
+       */
+      if (strcmp(outputBuffer, NONEXISTING_FILE) == 0) {
+        printf("[CLIENT] The server doesn't have a file\n", "");
+      }
+
+    } // End if S_IMAGE
 
     if (strcmp(outputBuffer, S_AUDIO) == 0) {
       printf("[CLIENT][RECEIVER][TCP] ENTRO EN IF S_AUDIO\n", "");
@@ -518,101 +543,10 @@ void *receiveTcpResponse(void *args) {
       }
 
       printf("[CLIENT][RECEIVER][TCP] Mis datos son\n", "");
-      printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
-      printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+      printf("[CLIENT][RECEIVER][TCP] Port: %d\n", ntohs(addr.sin_port));
+      printf("[CLIENT][RECEIVER][TCP] IP adress: %s\n", inet_ntoa(addr.sin_addr));
       printf("[CLIENT][RECEIVER][TCP] IP and port sended\n", "");
     } // End if S_AUDIO
-
-    if (strcmp(outputBuffer, S_IMAGE) == 0) {
-      printf("%s\n", "ENTRO A S_IMAGE");
-      off_t fileSize;
-
-      // Lee el tamaño del archivo a recibir
-      resultRecv = recv(socketTcpFd, &fileSize, sizeof(fileSize), 0);
-
-      if (resultRecv == -1) {
-        perror("recv");
-        exit(EXIT_FAILURE);
-      }
-
-      fileSize = ntohl(fileSize);
-
-      printf("[CLIENT RECEIVER] File size: %ld\n", fileSize);
-
-      char buffer[BUF_SIZE];
-      char fileName[BUF_SIZE] = "image.jpg";
-      char end[BUF_SIZE] = "END_IMAGE";
-
-      int bytesReceived = 0;
-      int flags = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
-      int fileFd = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, flags);
-
-      printf("%s\n", "ANTES DE ENTRAR EN EL WHILE");
-
-      while (bytesReceived < fileSize) {
-        resultRecv = recv(socketTcpFd, buffer, BUF_SIZE, 0);
-
-        if (resultRecv == -1) {
-          perror("recv");
-          exit(EXIT_FAILURE);
-        }
-
-        if (resultRecv == 0) {
-          perror("0");
-          exit(EXIT_FAILURE);
-        }
-
-        printf("%d\n", bytesReceived);
-        printf("%d\n", resultRecv);
-        printf("%s\n", "ENTRO");
-        // printf("CONTENIDO DE buffer: %s\n", buffer);
-
-        // if (strcmp(buffer, end) == 0) {
-        //   printf("%s\n", "ENTRO EN IF (buffer == end)");
-        //   break;
-        // }
-
-        write(fileFd, buffer, resultRecv);
-        bytesReceived += resultRecv;
-
-        // if (bytesReceived == fileSize) {
-        //   break;
-        // }
-
-      } // End while
-
-      resetBuffer(outputBuffer);
-
-      printf("%s\n", "SALIO DEL WHILE");
-
-      // while (bytesReceived != fileSize) {
-      //   printf("%s\n", "ENTRO EN EL WHILE");
-      //   resultRecv = recv(socketTcpFd, buffer, BUF_SIZE, 0);
-      //
-      //   if (resultRecv == -1) {
-      //     perror("recv");
-      //     exit(EXIT_FAILURE);
-      //   }
-      //
-      //   write(fileFd, buffer, resultRecv);
-      //   bytesReceived += resultRecv;
-      //
-      //   if (bytesReceived == fileSize) {
-      //     printf("%s\n", "ENTRO EN IF bytesReceived == fileSize");
-      //     break;
-      //   }
-      //
-      //   if (strcmp(buffer, end) == 0) {
-      //     printf("%s\n", "ENTRO EN IF buffer == end");
-      //     break;
-      //   }
-      //
-      //   printf("%s\n", "DENTRO DEL WHILE");
-      // }
-
-      close(fileFd);
-      printf("%s\n", "Image file received");
-    }
 
     printf("[CLIENT][TCP] Response from server: %s\n", outputBuffer);
 
@@ -645,8 +579,6 @@ void *receiveUdpResponse(void *args) {
   struct sockaddr_in addr;
   len = sizeof(addr);
 
-
-
   for(;;) {
     // len = sizeof(addr);
     numRead = recvfrom(socketUdpFd, outputBuffer, BUF_SIZE, 0, (struct sockaddr *) &addr, &len);
@@ -657,12 +589,12 @@ void *receiveUdpResponse(void *args) {
       exit(EXIT_FAILURE);
     }
 
-    printf("%s\n", "IF Notification received");
+    printf("[CLIENT][RECEIVER][UDP] %s\n", "IF Notification received");
     if (strcmp(outputBuffer, S_AUDIO) == 0) {
       printf("%s\n", "[CLIENT][RECEIVER][UDP] Notification received");
     }
 
-    printf("[CLIENT][UDP] Response from server: %s\n", outputBuffer);
+    printf("[CLIENT][RECEIVER][UDP] Response from server: %s\n", outputBuffer);
 
     /*
      * Si se llega al limite de conexiones del servidor, este

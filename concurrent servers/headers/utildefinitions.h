@@ -12,9 +12,9 @@ void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite
 
 void sendNoticeReceiver(int acceptfd, int receivingDepartmentId, char* answer);
 
-void invalidCommand(int acceptfd, char* invalidCommand, int clients[]);
+void invalidCommand(int acceptfd, int clients[]);
 
-void responseInvalidCommand(int acceptfd, char* answer, char* invalidCommand, int clients[]);
+void responseInvalidCommand(int acceptfd, int clients[]);
 
 bool existDepartment(int idDepartment);
 

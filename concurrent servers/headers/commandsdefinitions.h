@@ -10,10 +10,8 @@ void ienable(int acceptfd,  bool* sendDefaultMessage, const char* buf, pthread_m
 
 void idisable(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]);
 
-// Comando para la transmision y recepcion de imagenes
-void simage(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, int idDepartment, pthread_mutex_t lock, int clients[]);
-
-void rimage(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]);
+// Comando para la transmision de un archivo desde el servidor hacia un cliente
+void rimage(int acceptfd, bool* sendDefaultMessage, pthread_mutex_t lock, int clients[]);
 
 // Comandos para la emision y recepcion de llamadas
 void takecall(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]);

@@ -13,9 +13,13 @@
 // Headers
 #include "headers/answers.h"
 #include "headers/commandsdefinitions.h"
+#include "headers/confirmations.h"
 #include "headers/namecommands.h"
-#include "headers/utildefinitions.h"
 #include "headers/notices.h"
+#include "headers/utildefinitions.h"
+
+// Constants
+#define FILE_NAME "M101_hires_STScI-PRC2006-10a.jpg"
 
 // TODO: Documentar lo que haga falta documentar
 
@@ -65,298 +69,135 @@ void idisable(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_m
 }
 
 /*
- * Comandos para la transmision y recepcion de imagenes
+ * Comando para la transmision de un archivo desde el servidor hacia un cliente
  */
-void simage(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
+void rimage(int acceptFd, bool* sendDefaultMessage, pthread_mutex_t lock, int clients[]) {
+  int numWrite;
+  int fileFd;
+  int resultSend;
+  int bytesSended = 1;
+  int resultSendFile;
+
   off_t fileSize;
+  struct stat fileInfo;
 
   /*
-   * El servidor recibe del cliente el tamaño del archivo
-   * que quiere enviar
+   * El servidor le envia al cliente, que ejecuto el comando
+   * rimage, el aviso de que se le quiere enviar un archivo
    */
-  int resultRecv = recv(senderfd, &fileSize, sizeof(fileSize), 0);
+  numWrite = write(acceptFd, S_IMAGE, BUF_SIZE);
 
-  if (resultRecv == -1) {
-    perror("recv");
-    exit(EXIT_FAILURE);
-  }
-
-  fileSize = ntohl(fileSize);
-
-  printf("%s\n", "[SERVER] File size received");
-
-  /*
-   * El servidor recibe el archivo de imagen
-   */
-  char buffer[BUF_SIZE];
-  char fileName[BUF_SIZE] = "newimage.jpg";
-
-  int bytesReceived = 0;
-  int flags = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
-  int fileFd = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, flags);
-
-  while (bytesReceived != fileSize) {
-    resultRecv = recv(senderfd, buffer, BUF_SIZE, 0);
-
-    if (resultRecv == -1) {
-      perror("recv");
-      exit(EXIT_FAILURE);
-    }
-
-    write(fileFd, buffer, resultRecv);
-    bytesReceived += resultRecv;
-
-    if (bytesReceived == fileSize) {
-      break;
-    }
-
-  }
-
-  close(fileFd);
-
-  /*
-   * Se obtiene el FD del socket TCP correspondiente
-   * al cliente receptor
-   */
-  int receiverfd = clients[destinyDepartmentId - 1];
-  printf("[SERVER] ID destiny department: %i\n", destinyDepartmentId);
-
-  /*
-   * Se le avisa al cliente receptor que el servidor le
-   * va a enviar un archivo
-   */
-  int resultWrite = write(receiverfd, S_IMAGE, strlen(S_IMAGE) + 1);
-
-  if (resultWrite == -1) {
+  if (numWrite == -1) {
     perror("write");
     exit(EXIT_FAILURE);
   }
 
-  struct stat fileInfo;
-  off_t sizeFile;
-
-  int newFileFd = open("newimage.jpg", O_RDONLY);
-
-  if (newFileFd == -1) {
-    perror("open");
-    exit(EXIT_FAILURE);
-  } else {
-    printf("[SERVER] %s\n", "Open image file");
-  }
-
-  fstat(newFileFd, &fileInfo);
-  sizeFile = htonl(fileInfo.st_size);
-
-  printf("[SERVER] File size: %ld\n", fileInfo.st_size);
+  fileFd = open(FILE_NAME, O_RDONLY);
 
   /*
-   * El servidor le envia al cliente, con el cual esta
-   * conectado, el tamaño del archivo abierto
+   * El bloque then se ejecuta si en el directorio
+   * del servidor hay un archivo que tiene el nombre
+   * dado por la constante FILE_NAME, y por ende,
+   * se realiza la transferencia de dicho archivo
+   * desde este servidor a un cliente
    */
+  if (fileFd > -1) {
+    /*
+     * Si el flujo de ejecucion de la funcion llega hasta
+     * aca es porque el arhivo que el servidor desea abrir
+     * existe en su directorio
+     */
+    printf("[SERVER] Open image file\n", "");
 
-  int resultSend = send(receiverfd, (void *) &sizeFile, sizeof(sizeFile), 0);
+    /*
+     * El servidor le confirma al cliente, que ejecuto
+     * el comando rimage, que existe un archivo para
+     * la transferencia
+     */
+    numWrite = write(acceptFd, EXISTING_FILE, BUF_SIZE);
 
-  if (resultSend == -1) {
-    perror("send");
-    exit(EXIT_FAILURE);
-  }
-
-  int bytesSended = 1;
-  int resultSendFile;
-
-  /*
-   * El servidor le envia al cliente receptor el archivo
-   * que recibio de parte del cliente emisor
-   */
-  while (bytesSended > 0) {
-    printf("%s\n", "ENTRO");
-    resultSendFile = sendfile(receiverfd, newFileFd, NULL, BUF_SIZE);
-
-    if (resultSendFile == -1) {
-      perror("sendfile");
+    if (numWrite == -1) {
+      perror("write");
       exit(EXIT_FAILURE);
     }
 
-    bytesSended = resultSendFile;
+    /*
+     * Obtiene la informacion del archivo asociado
+     * al descriptor de archivo que se pasa como
+     * primer argumento, y coloca dicha informacion
+     * en la estructura fileInfo
+     */
+    fstat(fileFd, &fileInfo);
+    fileSize = htonl(fileInfo.st_size);
+    printf("[SERVER] File size: %d\n", fileInfo.st_size);
+
+    /*
+     * El servidor le envia al cliente, que ejecuto el comando
+     * rimage, el tamaño del archivo abierto
+     */
+    resultSend = send(acceptFd, (void *) &fileSize, sizeof(fileSize), 0);
+
+    if (resultSend == -1) {
+      perror("send");
+      exit(EXIT_FAILURE);
+    }
+
+    /*
+     * Esta parte del codigo fuente se encarga de la
+     * transferencia del archivo
+     */
+    while (bytesSended > 0) {
+      /*
+       * Cuando no hayan mas bytes para leer del
+       * archivo resultSendFile tendra el valor 0, el
+       * cual asignara a la bytesSended, lo cual a
+       * su vez hace que la instruccion while termine
+       * de ejecutarse
+       */
+      resultSendFile = sendfile(acceptFd, fileFd, NULL, BUF_SIZE);
+
+      if (resultSendFile == -1) {
+        perror("sendfile");
+        exit(EXIT_FAILURE);
+      }
+
+      bytesSended = resultSendFile;
+    }
+
+    int clientDepartmentId = getIdDepartment(clients, acceptFd);
+    printf("[SERVER] The client of the department %i executes the command: %s\n", clientDepartmentId, R_IMAGE);
+    printf("[SERVER] Response to client: %s", EXISTING_FILE);
+    printf("%s\n", "");
+    printf("[SERVER] File transfer completed\n", "");
+    printf("%s\n", "");
+  } // End if
+
+  /*
+   * El bloque then se ejecuta en caso de que no exista
+   * un archivo en el directorio del servidor
+   * con el nombre dado por la constante FILE_NAME, y
+   * por ende, no se realiza la transferencia de
+   * dicho archivo desde este servidor a un cliente
+   */
+  if (fileFd == -1) {
+    /*
+     * El servidor le confirma al cliente, que ejecuto
+     * el comando rimage, que no existe un archivo para
+     * la transferencia
+     */
+    numWrite = write(acceptFd, NONEXISTING_FILE, BUF_SIZE);
+
+    if (numWrite == -1) {
+      perror("write");
+      exit(EXIT_FAILURE);
+    }
+
+    int clientDepartmentId = getIdDepartment(clients, acceptFd);
+    printf("[SERVER] The client of the department %i executes the command: %s\n", clientDepartmentId, R_IMAGE);
+    perror("[SERVER] open");
+    printf("[SERVER] Response to client: %s\n", NONEXISTING_FILE);
+    printf("%s\n", "");
   }
-
-  close(newFileFd);
-
-  /*
-   * Despues de que el servidor envia el archivo al cliente
-   * receptor tiene que borrarlo de su directorio
-   */
-  int resultRemove = remove("./newimage.jpg");
-
-  if (resultRemove == -1) {
-    perror("remove");
-    exit(EXIT_FAILURE);
-  }
-
-  // char end[BUF_SIZE] = "END_IMAGE";
-  // resultSend = send(receiverfd, end, BUF_SIZE, 0);
-
-  // if (resultSend == -1) {
-  //   perror("send");
-  //   exit(EXIT_FAILURE);
-  // } else {
-  //   printf("[SERVER] Message END_IMAGE sended\n", "");
-  // }
-
-  printf("%s\n", "[SERVER] file sended");
-
-  /*
-   * El servidor envia el archivo de imagen al cliente
-   * receptor
-   */
-  // int bytesReceived = 0;
-  // int receiverfd = clients[destinyDepartmentId - 1];
-  // int resultSend;
-  //
-  // char buffer[BUF_SIZE];
-
-  /*
-   * Pasos para enviar al cliente receptor un archivo
-   * 1. Avisarle que se le va a enviar una imagen
-   * 2. Enviarle el tamaño del archivo
-   * 3. Enviarle el archivo
-   */
-
-  /*
-   * El servidor le avisa al cliente receptor que otro
-   * cliente (el emisor) le quiere enviar un archivo
-   */
-  // resultSend = send(receiverfd, S_IMAGE, BUF_SIZE, 0);
-  //
-  // if (resultSend == -1) {
-  //   perror("send");
-  //   exit(EXIT_FAILURE);
-  // }
-
-  /*
-   * El servidor le envia al cliente receptor el tamaño
-   * del archivo enviado por el cliente emisor
-   */
-  // resultSend = send(receiverfd, (void *) &fileSize, sizeof(fileSize), 0);
-
-  // if (resultSend == -1) {
-  //   perror("send");
-  //   exit(EXIT_FAILURE);
-  // }
-
-  // char end[BUF_SIZE] = "END_IMAGE";
-
-  /*
-   * El servidor lee lo enviado por el cliente emisor
-   * y lo envia al cliente receptor
-   */
-  // while (bytesReceived != fileSize) {
-  //   resultRecv = recv(senderfd, buffer, BUF_SIZE, 0);
-  //
-  //   if (resultRecv == -1) {
-  //     perror("recv");
-  //     exit(EXIT_FAILURE);
-  //   }
-  //
-  //   resultSend = send(receiverfd, buffer, BUF_SIZE, 0);
-  //
-  //   if (resultSend == -1) {
-  //     perror("send");
-  //     exit(EXIT_FAILURE);
-  //   }
-  //
-  //   bytesReceived += resultRecv;
-  //
-  //   if (bytesReceived == fileSize) {
-  //     resultSend = send(receiverfd, end, strlen(end) + 1, 0);
-  //
-  //     if (resultSend == -1) {
-  //       perror("send");
-  //       exit(EXIT_FAILURE);
-  //     }
-  //
-  //     break;
-  //   }
-  //
-  // }
-
-  // int resultWrite;
-
-  pthread_mutex_lock(&lock);
-  *sendDefaultMessage = false;
-  pthread_mutex_unlock(&lock);
-
-  /*
-   * Comprueba si el departamento solicitado
-   * existe, en caso de que no exista se le avisa
-   * de esto al cliente emisor de la imagen
-   */
-  // if (!existDepartment(destinyDepartmentId)) {
-  //   resultWrite = sendResultClient(senderfd, ANSWER_NO_DEPARTMENT);
-  //   sendResultServer(senderfd, S_IMAGE, ANSWER_NO_DEPARTMENT, resultWrite, clients);
-  //   return;
-  // }
-
-  // TODO: Modificar comentario
-  /*
-   * Si el departamento al que se quiere enviar algo
-   * es igual al departamento del emisor, no se tiene
-   * que enviar nada y se tiene que avisar de esto
-   * al emisor
-   */
-  // if (equalDepartment(senderfd, destinyDepartmentId, clients)) {
-  //   resultWrite = sendResultClient(senderfd, ANSWER_EQUAL_DEPARTMENT);
-  //   sendResultServer(senderfd, S_IMAGE, ANSWER_EQUAL_DEPARTMENT, resultWrite, clients);
-  //   return;
-  // }
-
-  /*
-   * Si el departamento existe, se comprueba que
-   * el cliente de dicho departamento este conectado,
-   * en caso de que el cliente receptor no este conectado
-   * se le avisa al cliente emisor de esto
-   */
-  // if (!connectedClient(destinyDepartmentId, clients)) {
-  //   resultWrite = sendResultClient(senderfd, ANSWER_CLIENT_NOT_CONNECTED);
-  //   sendResultServer(senderfd, S_IMAGE, ANSWER_CLIENT_NOT_CONNECTED, resultWrite, clients);
-  //   return;
-  // }
-
-  /*
-   * Se muestra en el servidor el cliente que ejecuto el comando simage
-   */
-  // sendResultServer(senderfd, S_IMAGE, ANSWER_SENDER_S_IMAGE, resultWrite, clients);
-
-  /*
-   * Se le avisa al cliente emisor que la supuesta imagen fue enviada
-   */
-  // resultWrite = sendResultClient(senderfd, ANSWER_SENDER_S_IMAGE);
-
-  // if (resultWrite == -1) {
-  //   perror("write");
-  //   exit(EXIT_FAILURE);
-  // }
-
-  // TODO: Modificar
-  // int senderDepartmentId = getIdDepartment(clients, senderfd);
-  // int receiverfd = clients[destinyDepartmentId - 1];
-
-  // char notification[BUF_SIZE];
-  // concatenateTextNotification(notification, IMAGE_NOTICE_TO_RECEIVER_FIRST_PART, IMAGE_NOTICE_TO_RECEIVER_SECOND_PART, senderDepartmentId);
-
-  /*
-   * Si el flujo de ejecucion llega hasta aca, es porque el
-   * cliente receptor (al que el cliente emisor le quiere
-   * enviar una imagen), esta conectado, en este caso, el
-   * servidor le tiene que enviar un aviso al receptor de
-   * que alguien le envio una imagen
-   */
-  // sendNoticeReceiver(receiverfd, destinyDepartmentId, notification);
-}
-
-void rimage(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-  int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_R_IMAGE);
-  sendResultServer(acceptfd, R_IMAGE, ANSWER_RECEIVER_R_IMAGE, resultWrite, clients);
 
   pthread_mutex_lock(&lock);
   *sendDefaultMessage = false;
