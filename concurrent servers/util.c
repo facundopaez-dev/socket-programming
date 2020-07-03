@@ -166,8 +166,7 @@ void resetCharArray(char buf[]) {
  * @return cantidad de conexiones activas
  */
 
-// TODO: Modificar la descripcion
-void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, int clients[]) {
+void addClient(int acceptFd, int socketUdpFd, int *amountConnections, pthread_mutex_t lock, int clients[], int clientsUdp[]) {
   pthread_mutex_lock(&lock);
 
   for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
@@ -186,7 +185,8 @@ void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, i
        * a traves del cual se hace la comunicacion
        * entre el hilo y un cliente
        */
-      clients[i] = connectionfd;
+      clients[i] = acceptFd;
+      clientsUdp[i] = socketUdpFd;
 
       /*
        * Se incrementa la cantidad de conexiones activas
@@ -204,6 +204,45 @@ void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, i
 
   pthread_mutex_unlock(&lock);
 }
+
+// TODO: Modificar la descripcion
+// void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, int clients[]) {
+//   pthread_mutex_lock(&lock);
+//
+//   for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
+//
+//     /*
+//      * Si la celda i del arreglo de clientes o conexiones
+//      * esta libre, entonces se puede establecer la conexion
+//      * entre el servidor y un cliente, y se registra esta
+//      * conexion en la celda i del arreglo de clientes
+//      *
+//      * Una celda se considera libre si tiene el valor -1
+//      */
+//     if (clients[i] == FREE_CONNECTION) {
+//       /*
+//        * Registra el descriptor de archivo del socket
+//        * a traves del cual se hace la comunicacion
+//        * entre el hilo y un cliente
+//        */
+//       clients[i] = connectionfd;
+//
+//       /*
+//        * Se incrementa la cantidad de conexiones activas
+//        */
+//       (*amountConnections) = (*amountConnections) + 1;
+//
+//       /*
+//        * Una vez que se encontro un espacio libre en el arreglo
+//        * se tiene que cortar el ciclo
+//        */
+//       break;
+//     }
+//
+//   } // End for
+//
+//   pthread_mutex_unlock(&lock);
+// }
 
 void removeClient(int clients[], int connectionfd, int *amountConnections) {
 

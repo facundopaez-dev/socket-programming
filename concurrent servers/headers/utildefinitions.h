@@ -28,7 +28,9 @@ int getIdDepartment(int clients[], int acceptfd);
 
 void resetCharArray(char buf[]);
 
-void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, int clients[]);
+void addClient(int connectionfd, int socketUdpFd, int *amountConnections, pthread_mutex_t lock, int clients[], int clientsUdp[]);
+
+// void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, int clients[]);
 
 void removeClient(int clients[], int connectionfd, int *amountConnections);
 

@@ -421,16 +421,64 @@ void callto(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
 /*
  * Comandos para la transmision y recepcion de audio
  */
-void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
+// void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
+// void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[], int clientsUdp[]) {
+void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[], int clientsUdp[],
+struct sockaddr_in addr) {
+
+  /*
+   * Validaciones
+   * 1. Que el departamento del cliente con el cual
+   * se quiere hablar exista
+   * 2. Que el ID del departamento del cliente que quiere
+   * hablar con otro no sea igual al ID del departamento
+   * del cliente con el que se quiere hablar
+   * 3. Que el cliente con el que se queire hablar
+   * este conectado
+   */
+
+  /*
+   * Cosas a tener en cuenta
+   * Antes de establecer el chat entre los clientes
+   * se tiene que enviar un aviso al cliente
+   * receptor
+   *
+   * Si el cliente receptor acepta la llamada se tiene
+   * que abrir el chat, en caso contrario no se tiene
+   * que abrir el chat
+   */
+
   socklen_t len;
-  struct sockaddr_in addr;
+  // struct sockaddr_in addr;
+  len = sizeof(struct sockaddr);
+
+  int receiverUdpFd = clientsUdp[destinyDepartmentId - 1];
+  printf("[SERVER] UDP FD of client receiver: %d\n", receiverUdpFd);
+
+  char buffer[BUF_SIZE] = S_AUDIO;
+
+  printf("%s\n", "[SERVER] Datos del cliente receptor");
+  printf("[SERVER] Port: %d\n", ntohs(addr.sin_port));
+  printf("[SERVER] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+
+  /*
+   * Se le envia un aviso al cliente receptor de que alguien
+   * quiere hablar con el
+   */
+  int resultSendTo = sendto(receiverUdpFd, buffer, BUF_SIZE, 0, (struct sockaddr *) &addr, len);
+
+  if (resultSendTo == -1) {
+    perror("sendto");
+    exit(EXIT_FAILURE);
+  }
+
+  printf("[SERVER][UDP] Notification S_AUDIO sended\n", "");
 
   int numRead;
   char buf[BUF_SIZE];
 
-  printf("%s\n", "Ejecución del comando sendaudio");
+  printf("%s\n", "[SERVER][UDP] Ejecución del comando sendaudio");
 
-  /* Recibe datagramas y retorna copias a los emisores */
   for (;;) {
     len = sizeof(struct sockaddr);
     numRead = recvfrom(senderfd, buf, BUF_SIZE, 0, (struct sockaddr *) &addr, &len);

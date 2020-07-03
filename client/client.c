@@ -478,6 +478,7 @@ void *receiveTcpResponse(void *args) {
   struct structparams *params = (struct structparams *) args;
 
   int numRead;
+  int numWrite;
   int socketTcpFd = params -> socketTcpFd;
   int resultRecv;
 
@@ -486,12 +487,41 @@ void *receiveTcpResponse(void *args) {
   for(;;) {
     numRead = read(socketTcpFd, outputBuffer, BUF_SIZE);
 
-    printf("[CLIENT RECEIVER] numRead: %d\n", numRead);
+    // printf("[CLIENT RECEIVER] numRead: %d\n", numRead);
 
     if (numRead == -1) {
       perror("read");
       exit(EXIT_FAILURE);
     }
+
+    if (strcmp(outputBuffer, S_AUDIO) == 0) {
+      printf("[CLIENT][RECEIVER][TCP] ENTRO EN IF S_AUDIO\n", "");
+      struct sockaddr_in addr;
+      socklen_t len = sizeof(addr);
+
+      int resultGetSockName = getsockname(socketTcpFd, (struct sockaddr *) &addr, &len);
+
+      if (resultGetSockName == -1) {
+        perror("getsockname");
+        exit(EXIT_FAILURE);
+      }
+
+      /*
+       * El cliente receptor le envia al servidor (mediante el socket TCP)
+       * su direccion IP y puerto
+       */
+      numWrite = write(socketTcpFd, (const void *) &addr, sizeof(addr));
+
+      if (numWrite == -1) {
+        perror("write");
+        exit(EXIT_FAILURE);
+      }
+
+      printf("[CLIENT][RECEIVER][TCP] Mis datos son\n", "");
+      printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
+      printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+      printf("[CLIENT][RECEIVER][TCP] IP and port sended\n", "");
+    } // End if S_AUDIO
 
     if (strcmp(outputBuffer, S_IMAGE) == 0) {
       printf("%s\n", "ENTRO A S_IMAGE");
@@ -613,14 +643,23 @@ void *receiveUdpResponse(void *args) {
 
   socklen_t len;
   struct sockaddr_in addr;
+  len = sizeof(addr);
+
+
 
   for(;;) {
-    len = sizeof(addr);
+    // len = sizeof(addr);
     numRead = recvfrom(socketUdpFd, outputBuffer, BUF_SIZE, 0, (struct sockaddr *) &addr, &len);
+    // outputBuffer[numRead - 1] = '\0';
 
     if (numRead == -1) {
       perror("read");
       exit(EXIT_FAILURE);
+    }
+
+    printf("%s\n", "IF Notification received");
+    if (strcmp(outputBuffer, S_AUDIO) == 0) {
+      printf("%s\n", "[CLIENT][RECEIVER][UDP] Notification received");
     }
 
     printf("[CLIENT][UDP] Response from server: %s\n", outputBuffer);

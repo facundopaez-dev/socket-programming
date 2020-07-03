@@ -20,6 +20,7 @@
 
 /* Este arreglo contiene los FD de cada socket usado por cada cliente */
 int clients[CONNECTION_LIMIT];
+int clientsUdp[CONNECTION_LIMIT];
 
 /*
  * Variable global utilizada para enviar un mensaje
@@ -71,6 +72,7 @@ int main(int argc, char *argv[]) {
    * basura que hayan sido cargados en el al momento de crearlo
    */
   fill(clients);
+  fill(clientsUdp);
 
   /*
    * Este arreglo contiene la cadena de texto que sera enviada
@@ -118,7 +120,8 @@ int main(int argc, char *argv[]) {
        * conexiones
        */
       if (resultPthreadCreate == 0) {
-        addClient(acceptFd, &amountConnections, lock, clients);
+        // addClient(acceptFd, &amountConnections, lock, clients);
+        addClient(acceptFd, socketUdpFd, &amountConnections, lock, clients, clientsUdp);
         printConnections(&amountConnections);
       }
 
@@ -157,6 +160,7 @@ void *handleRequest(void *args) {
   int acceptFd = params -> acceptFd;
   int socketUdpFd = params -> socketUdpFd;
   int idDepartment = 0;
+  int resultWrite = 0;
 
   char buf[BUF_SIZE];
   char mode[BUF_SIZE];
@@ -281,7 +285,7 @@ void *handleRequest(void *args) {
       printf("%s\n", "");
 
       if (resultGetSockName == -1) {
-        perror("getFdSocketTcp");
+        perror("getsockname");
         exit(EXIT_FAILURE);
       }
 
@@ -303,10 +307,54 @@ void *handleRequest(void *args) {
        * Comandos: Audio
        */
       if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
+
+        /*
+         * 1. Avisarle por TCP al cliente receptor que alguien
+         * quiere hablar con el
+         *
+         * 2. Esperar del cliente receptor sus datos, esto es,
+         * su direccion IP y puerto
+         *
+         * 3. Una vez que se recibieron los datos del cliente
+         * receptor, enviarlos a la funcion addClient
+         */
+
+        int receiverTcpFd = clients[idDepartment - 1];
+
+        /*
+         * Se le avisa al cliente receptor de que alguien quiere
+         * hablar con el
+         */
+        resultWrite = write(receiverTcpFd, S_AUDIO, strlen(S_AUDIO) + 1);
+
+        if (resultWrite == -1) {
+          perror("write");
+          exit(EXIT_FAILURE);
+        }
+
+        socklen_t len;
+        struct sockaddr_in addr;
+
+        /*
+         * El servidor recibe los datos del cliente receptor, los cuales
+         * son la direccion IP y puerto
+         */
+        numRead = read(receiverTcpFd, (void *) &addr, sizeof(addr));
+
+        if (numRead == -1) {
+          perror("read");
+          exit(EXIT_FAILURE);
+        }
+
+        // exit(EXIT_SUCCESS);
+
         printf("[SERVER] Command executed: %s\n", S_AUDIO);
-        sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+        // sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+        // sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients, clientsUdp);
+        sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients, clientsUdp, addr);
       }
 
+      // NOTE: Puede que este comando sea borrado
       // if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
       //   recaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
       // }
