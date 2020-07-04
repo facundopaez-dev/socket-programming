@@ -12,4 +12,4 @@ void displayDataSent(char* sendBuffer);
 
 int getFdSocketTcp(char* ip, char* port);
 
-int getFdSocketUdp(char* ip, char* port);
+int getFdSocketUdp(int socketTcpFd);

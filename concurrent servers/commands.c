@@ -264,8 +264,8 @@ void callto(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
  */
 // void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
 // void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[], int clientsUdp[]) {
-void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[], int clientsUdp[],
-struct sockaddr_in addr) {
+void sendaudio(int senderUdpFd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[], int clientsUdp[],
+struct sockaddr_in addrReceiver) {
 
   /*
    * Validaciones
@@ -289,24 +289,24 @@ struct sockaddr_in addr) {
    * que abrir el chat
    */
 
-  socklen_t len;
-  // struct sockaddr_in addr;
-  len = sizeof(struct sockaddr);
+  socklen_t len = sizeof(struct sockaddr_in);
+  struct sockaddr_in addrsSender;
 
   int receiverUdpFd = clientsUdp[destinyDepartmentId - 1];
+  printf("[SERVER] UDP FD of client sender: %d\n", senderUdpFd);
   printf("[SERVER] UDP FD of client receiver: %d\n", receiverUdpFd);
 
-  char buffer[BUF_SIZE] = S_AUDIO;
-
   printf("%s\n", "[SERVER] Datos del cliente receptor");
-  printf("[SERVER] Port: %d\n", ntohs(addr.sin_port));
-  printf("[SERVER] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+  printf("[SERVER] Port: %d\n", ntohs(addrReceiver.sin_port));
+  printf("[SERVER] IP adress: %s\n", inet_ntoa(addrReceiver.sin_addr));
+
+  char buffer[BUF_SIZE] = S_AUDIO;
 
   /*
    * Se le envia un aviso al cliente receptor de que alguien
    * quiere hablar con el
    */
-  int resultSendTo = sendto(receiverUdpFd, buffer, BUF_SIZE, 0, (struct sockaddr *) &addr, len);
+  int resultSendTo = sendto(receiverUdpFd, buffer, BUF_SIZE, 0, (struct sockaddr *) &addrReceiver, len);
 
   if (resultSendTo == -1) {
     perror("sendto");
@@ -316,21 +316,21 @@ struct sockaddr_in addr) {
   printf("[SERVER][UDP] Notification S_AUDIO sended\n", "");
 
   int numRead;
-  char buf[BUF_SIZE];
+  char bufferChat[BUF_SIZE];
 
   printf("%s\n", "[SERVER][UDP] Ejecución del comando sendaudio");
 
   for (;;) {
-    len = sizeof(struct sockaddr);
-    numRead = recvfrom(senderfd, buf, BUF_SIZE, 0, (struct sockaddr *) &addr, &len);
-    printf("Received: %s\n", buf);
+    len = sizeof(struct sockaddr_in);
+    numRead = recvfrom(senderUdpFd, bufferChat, BUF_SIZE, 0, (struct sockaddr *) &addrsSender, &len);
+    printf("Received from sender: %s\n", bufferChat);
 
     if (numRead == -1) {
-      fprintf(stderr, "%s\n", buf);
+      fprintf(stderr, "%s\n", bufferChat);
     }
 
-    if (sendto(senderfd, buf, numRead, 0, (struct sockaddr *) &addr, len) != numRead) {
-      fprintf(stderr, "%s\n", buf);
+    if (sendto(receiverUdpFd, bufferChat, numRead, 0, (struct sockaddr *) &addrReceiver, len) != numRead) {
+      fprintf(stderr, "%s\n", bufferChat);
     }
 
   } // End for

@@ -59,17 +59,26 @@ int getFdSocketTcp(char* ip, char* port) {
   return socketTcpFd;
 }
 
-int getFdSocketUdp(char* ip, char* port) {
+/*
+ * Recibir IP y puerto como numero, o va
+ * a tener q recibir el socket TCP para averiguar
+ * IP y puerto locales
+ *
+ * Esto se lo tiene que hacer despues de ejecutar connect()
+ */
+int getFdSocketUdp(int socketTcpFd) {
   int socketUdpFd;
   int bindUdpFd;
 
   struct sockaddr_in addrUdp;
-  socklen_t addrlenUdp;
+  socklen_t addrlenUdp = sizeof(struct sockaddr_in);
 
-  addrlenUdp = sizeof(addrUdp);
+  getsockname(socketTcpFd, (struct sockaddr *) &addrUdp, &addrlenUdp);
 
-  inet_aton(ip, &(addrUdp.sin_addr));
-  addrUdp.sin_port = htons(atoi(port));
+  // addrlenUdp = sizeof(addrUdp);
+
+  // inet_aton(ip, &(addrUdp.sin_addr));
+  // addrUdp.sin_port = htons(atoi(port));
 
   /* La constante AF_INET indica que la comunicacion entre los clientes
   y el servidor (ambos son aplicaciones) va a ser utilizando el protocolo IPv4 */
@@ -97,12 +106,16 @@ int getFdSocketUdp(char* ip, char* port) {
    * el programa cliente, pero sí lo es en el programa
    * servidor
    */
-  // bindUdpFd = bind(socketUdpFd, (struct sockaddr*) &addrUdp, addrlenUdp);
-  //
-  // if (bindUdpFd == -1) {
-  //   perror("Bind error: Could not bind server socket");
-  //   exit(EXIT_FAILURE);
-  // }
+  bindUdpFd = bind(socketUdpFd, (struct sockaddr*) &addrUdp, addrlenUdp);
+
+  printf("[CLIENT][UDP] Se ejecuta el bind()\n", "");
+  printf("[CLIENT] Port: %d\n", ntohs(addrUdp.sin_port));
+  printf("[CLIENT] IP adress: %s\n", inet_ntoa(addrUdp.sin_addr));
+
+  if (bindUdpFd == -1) {
+    perror("Bind error: Could not bind server socket");
+    exit(EXIT_FAILURE);
+  }
 
   return socketUdpFd;
 }

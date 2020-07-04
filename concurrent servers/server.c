@@ -162,12 +162,12 @@ void *handleRequest(void *args) {
   int idDepartment = 0;
   int resultWrite = 0;
 
-  char buf[BUF_SIZE];
-  char mode[BUF_SIZE];
-  char nameCommandBuf[BUF_SIZE];
+  char buf[BUF_SIZE] = "";
+  char mode[BUF_SIZE] = "";
+  char nameCommandBuf[BUF_SIZE] = "";
 
-  ssize_t numWrite;
-  ssize_t numRead;
+  ssize_t numWrite = 0;
+  ssize_t numRead = 0;
 
   pthread_mutex_lock(&lock);
   sendDefaultMessage = true;
@@ -203,6 +203,8 @@ void *handleRequest(void *args) {
      * por ende, es el indice de esa celda
      */
     sscanf(buf, "%s%s%i", mode, nameCommandBuf, &idDepartment);
+    // printf("%s\n", nameCommandBuf);
+    // printf("%d\n", idDepartment);
 
     // Comprobar el protocolo a utilizar
     // Si el protocolo a utilizar es TCP, usar el FD de TCP
@@ -264,7 +266,7 @@ void *handleRequest(void *args) {
       printf("%s\n", "[SERVER] UDP protocol in use");
 
       struct sockaddr_in addr;
-      socklen_t len = sizeof(addr);
+      socklen_t len = sizeof(struct sockaddr_in);
 
       printf("[SERVER] UDP socket's number: %d\n", socketUdpFd);
       printf("%s\n", "");
@@ -296,6 +298,8 @@ void *handleRequest(void *args) {
         exit(EXIT_FAILURE);
       }
 
+      // printf("[SERVER][UDP] nameCommandBuf content: %s\n", nameCommandBuf);
+
       /*
        * Si el comando es para UDP, se tiene que ejecutar
        * haciendo uso del protocolo UDP
@@ -303,6 +307,7 @@ void *handleRequest(void *args) {
        * Comandos: Audio
        */
       if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
+        printf("[SERVER] Command executed: %s\n", S_AUDIO);
 
         /*
          * 1. Avisarle por TCP al cliente receptor que alguien
@@ -312,43 +317,42 @@ void *handleRequest(void *args) {
          * su direccion IP y puerto
          *
          * 3. Una vez que se recibieron los datos del cliente
-         * receptor, enviarlos a la funcion addClient
+         * receptor, pasarlos como argumento en la invocacion
+         * de la funcion sendaudio
          */
 
         int receiverTcpFd = clients[idDepartment - 1];
+        printf("Receiver TCP fd: %d\n", receiverTcpFd);
 
         /*
-         * Se le avisa al cliente receptor de que alguien quiere
+         * 1. Se le avisa al cliente receptor de que alguien quiere
          * hablar con el
          */
-        resultWrite = write(receiverTcpFd, S_AUDIO, strlen(S_AUDIO) + 1);
+        resultWrite = write(receiverTcpFd, S_AUDIO, BUF_SIZE);
 
         if (resultWrite == -1) {
           perror("write");
           exit(EXIT_FAILURE);
         }
 
-        socklen_t len;
-        struct sockaddr_in addr;
+        struct sockaddr_in addrReceiver;
 
         /*
-         * El servidor recibe los datos del cliente receptor, los cuales
+         * 2. El servidor recibe los datos del cliente receptor, los cuales
          * son la direccion IP y puerto
          */
-        numRead = read(receiverTcpFd, (void *) &addr, sizeof(addr));
+        numRead = read(receiverTcpFd, (void *) &addrReceiver, sizeof(struct sockaddr_in));
 
         if (numRead == -1) {
           perror("read");
           exit(EXIT_FAILURE);
         }
 
-        // exit(EXIT_SUCCESS);
-
-        printf("[SERVER] Command executed: %s\n", S_AUDIO);
         // sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
         // sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients, clientsUdp);
-        sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients, clientsUdp, addr);
+        sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients, clientsUdp, addrReceiver);
       }
+
 
       // NOTE: Puede que este comando sea borrado
       // if (strcmp(nameCommandBuf, R_AUDIO) == 0) {

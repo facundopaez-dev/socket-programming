@@ -24,8 +24,26 @@
 #define PORT "50001"
 #define FILE_NAME "Pinwheel Galaxy Messier 101.jpg"
 
+/*
+ * Variable utilizada para la exclusion mutua de los
+ * recursos compartidos por los hilos
+ */
 pthread_mutex_t lock;
 
+/*
+ * Estructura utilizada para el pasaje de parametro
+ * a los hilos
+ *
+ * Cuando se ejecuta el programa cliente, en la
+ * funcion main se crean dos sockets, uno TCP y
+ * el otro UDP, y de cada uno de ellos se obtiene
+ * un descriptor de archivo, los cuales son
+ * almacenados en esta estructura para luego
+ * pasarla a los hilos, y asi poder usar,
+ * dentro de ellos los descriptores de archivo
+ * de los sockets creados, para la comunicacion
+ * entre este cliente y un servidor
+ */
 struct structparams {
   int socketTcpFd;
   int socketUdpFd;
@@ -37,9 +55,27 @@ void *receiveTcpResponse(void *args);
 
 void *receiveUdpResponse(void *args);
 
+/**
+ * Esta funcion se encarga de crear los tres hilos
+ * del cliente, uno de ellos es para enviar solicitudes
+ * a un servidor, otro es para recibir respuestas (en
+ * modo TCP) de parte del servidor y otro es para
+ * recibir respuestas (en modo UDP) de parte del
+ * servidor
+ *
+ * @param  argc
+ * @param  argv
+ * @return
+ */
 int main(int argc, char *argv[]) {
-  int socketTcpFd = getFdSocketTcp(IP, PORT);
-  int socketUdpFd = getFdSocketUdp(IP, PORT);
+  struct structparams params;
+  params.socketTcpFd = getFdSocketTcp(IP, PORT);
+
+  /*
+   * Se le tiene que pasar el ip y puerto local, no los
+   * datos del servidor
+   */
+  params.socketUdpFd = getFdSocketUdp(params.socketTcpFd);
 
   int resultSendThread;
   int resultReceiveTcpThread;
@@ -49,9 +85,14 @@ int main(int argc, char *argv[]) {
   pthread_t receiveResponseTcpThread;
   pthread_t receiveResponseUdpThread;
 
-  struct structparams params;
-  params.socketTcpFd = socketTcpFd;
-  params.socketUdpFd = socketUdpFd;
+  printf("Ejecucion de la funcion main\n", "");
+
+  struct sockaddr_in addr;
+  socklen_t len = sizeof(struct sockaddr_in);
+
+  getsockname(params.socketUdpFd, (struct sockaddr *) &addr, &len);
+  printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
+  printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
 
   resultSendThread = pthread_create(&sendRequestThread, NULL, sendRequest, (void *) &params);
   resultReceiveTcpThread = pthread_create(&receiveResponseTcpThread, NULL, receiveTcpResponse, (void *) &params);
@@ -59,27 +100,27 @@ int main(int argc, char *argv[]) {
 
   if (resultSendThread != 0) {
     printf("ERROR: return code from pthread_create() is %i\n", resultSendThread);
-    close(socketTcpFd);
-    close(socketUdpFd);
+    close(params.socketTcpFd);
+    close(params.socketUdpFd);
     exit(EXIT_FAILURE);
   }
 
   if (resultReceiveTcpThread != 0) {
     printf("ERROR: return code from pthread_create() is %i\n", resultReceiveTcpThread);
-    close(socketTcpFd);
-    close(socketUdpFd);
+    close(params.socketTcpFd);
+    close(params.socketUdpFd);
     exit(EXIT_FAILURE);
   }
 
   if (resultReceiveUdpThread != 0) {
     printf("ERROR: return code from pthread_create() is %i\n", resultReceiveUdpThread);
-    close(socketTcpFd);
-    close(socketUdpFd);
+    close(params.socketTcpFd);
+    close(params.socketUdpFd);
     exit(EXIT_FAILURE);
   }
 
   /*
-   * Esto evita que el programa termine su ejecucion
+   * Esto evita que el programa cliente termine su ejecucion
    *
    * Esta instruccion hace que el hilo principal, espere
    * la terminacion del hilo que se le pasa como primer
@@ -88,22 +129,59 @@ int main(int argc, char *argv[]) {
   pthread_join(sendRequestThread, NULL);
 } // End main
 
+/**
+ * Esta funcion en el programa cliente esta encargada de enviarle
+ * solicitudes al servidor con el cual esta conectado este cliente
+ *
+ * @param  args [se utiliza una estructura como argumento de esta funcion]
+ * @return
+ */
 void *sendRequest(void *args) {
+  /*
+   * Recordar que esta estructura contiene los descriptores
+   * de archivo de los sockets TCP y UDP creados en la
+   * funcion main()
+   */
   struct structparams *params = (struct structparams *) args;
+  int socketTcpFd = params -> socketTcpFd;
+  int socketUdpFd = params -> socketUdpFd;
 
   int numRead;
   int numWrite;
   int idDepartment;
-  int socketTcpFd = params -> socketTcpFd;
-  int socketUdpFd = params -> socketUdpFd;
 
+  /*
+   * Esta variable se la utiliza para que el cliente,
+   * le envie al servidor, un aviso de que se ingreso
+   * texto que no coincide con ninguno de los comandos
+   * definidos en el protocolo de comunicacion
+   */
   bool sendInvalidCommand = true;
 
+  /*
+   * Este arreglo almacena lo que se ingresa por
+   * teclado
+   */
   char inputBuffer[BUF_SIZE];
+
+  /*
+   * Este arreglo almacena el nombre del comando
+   * que se ingresa por el teclado
+   */
   char nameCommandBuf[BUF_SIZE];
+
+  /*
+   * Este arreglo contiene el modo de operacion
+   * (TCP o UDP), seguido del nombre del comando
+   * y el ID del departamento (si es que se lo provee
+   * por el teclado)
+   */
   char sendBuffer[BUF_SIZE] = "";
 
   for(;;) {
+    /*
+     * Espera que por teclado se ingrese un comando
+     */
     numRead = read(0, inputBuffer, BUF_SIZE);
 
     if (numRead == -1) {
@@ -112,7 +190,7 @@ void *sendRequest(void *args) {
     }
 
     /*
-     * Esto suprime el \n de la cadena enviada por el cliente
+     * Esto suprime el \n de la cadena ingresada por el teclado
      * haciendo que las cadenas de texto que son iguales no
      * den como resultado (por la funcion strcmp) que son
      * diferentes
@@ -124,14 +202,15 @@ void *sendRequest(void *args) {
      * es el ID de un departamento
      *
      * Hay que recordar que el ID de un departamento en el
-     * arreglo de conexiones es una celda del arreglo, y
+     * arreglo de conexiones (este arreglo esta en el programa
+     * servidor y se llama clients) es una celda del arreglo, y
      * por ende, es el indice de esa celda
      */
     sscanf(inputBuffer, "%s%d", nameCommandBuf, &idDepartment);
 
     /*
-     * Es necesario reiniciar el buffer de envio, en caso
-     * contrario el programa cliente mostrata por pantalla
+     * Es necesario borrar el contenido del buffer de envio, en caso
+     * contrario el programa cliente mostrara por pantalla
      * resultados erroneos
      */
     resetBuffer(sendBuffer);
@@ -140,11 +219,23 @@ void *sendRequest(void *args) {
      * Si el comando es para TCP, se tiene que ejecutar
      * haciendo uso del protocolo TCP
      *
-     * Comandos: Luces, riego, imagen, desconexion,
-     * ping y id
+     * Los comandos para las luces, el riego, la imagen,
+     * la desconexion, el ping y el id hacen uso de TCP
      */
     if (strcmp(nameCommandBuf, TURN_ON) == 0) {
+      /*
+       * Se coloca en el primer lugar de sendBuffer
+       * el modo de operacion, en este caso TCP
+       */
       strcat(sendBuffer, FIELD_TCP);
+
+      /*
+       * Luego de colocar el modo de operacion en
+       * sendBuffer, se coloca lo que se ingreso
+       * por el teclado, lo cual es el nombre
+       * del comando seguido del ID de un
+       * departamento en caso de que sea provisto
+       */
       strcat(sendBuffer, inputBuffer);
 
       displayCommandExecuted(TURN_ON);
@@ -320,6 +411,8 @@ void *sendRequest(void *args) {
      * Comandos: Audio
      */
     if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
+      printf("[CLIENT][RECEIVER][TCP] sendaudio command executed\n", "");
+
       strcat(sendBuffer, FIELD_UDP);
       strcat(sendBuffer, inputBuffer);
 
@@ -330,7 +423,7 @@ void *sendRequest(void *args) {
        * El cliente le envia el comando sendaudio al servidor con el
        * que esta conectado
        */
-      numWrite = write(socketTcpFd, sendBuffer, strlen(sendBuffer) + 1);
+      numWrite = write(socketTcpFd, sendBuffer, BUF_SIZE);
 
       /*
        * Pasos para conectar el socket UDP del cliente con
@@ -343,14 +436,14 @@ void *sendRequest(void *args) {
        * 3. Luego, utilizar la estructura de tipo sockaddr_in
        * en la llamada al sistema sendto
        */
-      socklen_t len;
+      socklen_t len = sizeof(struct sockaddr_in);
       struct sockaddr_in addr;
 
       /*
        * El cliente recibe los datos del servidor asociados al socket
        * UDP del mismo, los cuales son la direccion IP y el puerto
        */
-      numRead = read(socketTcpFd, (void *) &addr, sizeof(addr));
+      numRead = read(socketTcpFd, (void *) &addr, len);
 
       printf("%s\n", "");
       printf("%s\n", "[CLIENT] UDP data");
@@ -396,12 +489,6 @@ void *sendRequest(void *args) {
        * ingreso un comando invalido
        */
       write(socketTcpFd, INVALID_COMMAND_NOTICE, BUF_SIZE);
-
-      /*
-       * El cliente le envia al servidor lo que ingresado
-       * por el teclado es un comando invalido
-       */
-      numWrite = write(socketTcpFd, inputBuffer, BUF_SIZE);
     }
 
     /*
@@ -520,7 +607,8 @@ void *receiveTcpResponse(void *args) {
     } // End if S_IMAGE
 
     if (strcmp(outputBuffer, S_AUDIO) == 0) {
-      printf("[CLIENT][RECEIVER][TCP] ENTRO EN IF S_AUDIO\n", "");
+      printf("[CLIENT][RECEIVER][TCP] Recibó la notificación de parte del servidor de que alguien quiere hablar conmigo mediante UDP\n", "");
+      printf("[CLIENT][RECEIVER][TCP] Lo que voy a hacer es enviarle al servidor mi IP y puerto\n", "");
       struct sockaddr_in addr;
       socklen_t len = sizeof(addr);
 
@@ -530,6 +618,10 @@ void *receiveTcpResponse(void *args) {
         perror("getsockname");
         exit(EXIT_FAILURE);
       }
+
+      printf("[CLIENT][RECEIVER][TCP] Mis datos son:\n", "");
+      printf("[CLIENT][RECEIVER][TCP] Port: %d\n", ntohs(addr.sin_port));
+      printf("[CLIENT][RECEIVER][TCP] IP adress: %s\n", inet_ntoa(addr.sin_addr));
 
       /*
        * El cliente receptor le envia al servidor (mediante el socket TCP)
@@ -542,10 +634,7 @@ void *receiveTcpResponse(void *args) {
         exit(EXIT_FAILURE);
       }
 
-      printf("[CLIENT][RECEIVER][TCP] Mis datos son\n", "");
-      printf("[CLIENT][RECEIVER][TCP] Port: %d\n", ntohs(addr.sin_port));
-      printf("[CLIENT][RECEIVER][TCP] IP adress: %s\n", inet_ntoa(addr.sin_addr));
-      printf("[CLIENT][RECEIVER][TCP] IP and port sended\n", "");
+      printf("[CLIENT][RECEIVER][TCP] IP y puerto enviados al servidor\n", "");
     } // End if S_AUDIO
 
     printf("[CLIENT][TCP] Response from server: %s\n", outputBuffer);
@@ -570,17 +659,30 @@ void *receiveTcpResponse(void *args) {
 void *receiveUdpResponse(void *args) {
   struct structparams *params = (struct structparams *) args;
 
+  socklen_t len = sizeof(struct sockaddr_in);
+  struct sockaddr_in addr;
+
   int socketUdpFd = params -> socketUdpFd;
   int numRead;
 
   char outputBuffer[BUF_SIZE];
 
-  socklen_t len;
-  struct sockaddr_in addr;
-  len = sizeof(addr);
+  int resultGetSockName = getsockname(socketUdpFd, (struct sockaddr *) &addr, &len);
+
+  printf("[CLIENT][UDP] Se ejecuta, en un hilo, la funcion receiveUdpResponse\n", "");
+  printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
+  printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+
+  if (resultGetSockName == -1) {
+    perror("getsockname");
+    exit(EXIT_FAILURE);
+  }
+
+
+  // len = sizeof(addr);
 
   for(;;) {
-    // len = sizeof(addr);
+    len = sizeof(addr);
     numRead = recvfrom(socketUdpFd, outputBuffer, BUF_SIZE, 0, (struct sockaddr *) &addr, &len);
     // outputBuffer[numRead - 1] = '\0';
 
@@ -589,7 +691,6 @@ void *receiveUdpResponse(void *args) {
       exit(EXIT_FAILURE);
     }
 
-    printf("[CLIENT][RECEIVER][UDP] %s\n", "IF Notification received");
     if (strcmp(outputBuffer, S_AUDIO) == 0) {
       printf("%s\n", "[CLIENT][RECEIVER][UDP] Notification received");
     }

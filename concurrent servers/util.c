@@ -150,7 +150,7 @@ int getIdDepartment(int clients[], int acceptfd) {
  * @param buf [arreglo de caracteres]
  */
 void resetCharArray(char buf[]) {
-  for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
+  for (size_t i = 0; i < strlen(buf); i++) {
     buf[i] = '\0';
   }
 }
@@ -372,6 +372,9 @@ int getFdSocketUdp(int acceptfd) {
    * con la IP y el puerto del servidor
    */
   getsockname(acceptfd, (struct sockaddr *) &sudpaddr, &udpaddrlen);
+
+  // Puerto efimero
+  sudpaddr.sin_port = 0;
 
   // printf("%s\n", "[SERVER] UDP data");
   // printf("[SERVER] Port: %d\n", ntohs(sudpaddr.sin_port));
