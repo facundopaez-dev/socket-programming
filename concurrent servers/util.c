@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
+
+// Headers
 #include "headers/answers.h"
 #include "headers/utildefinitions.h"
 
@@ -34,10 +36,23 @@ int sendResultClient(int acceptfd, char* answer) {
   return write(acceptfd, answer, strlen(answer) + 1);
 }
 
+int sendNoticeClientUdp(int senderUdpFd, char* answer, struct sockaddr_in addrSender) {
+  return sendto(senderUdpFd, answer, BUF_SIZE, 0, (struct sockaddr *) &addrSender, sizeof(struct sockaddr_in));
+}
+
 void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite, int clients[]) {
 
   if (resultWrite > 0) {
     int senderDepartmentId = getIdDepartment(clients, acceptfd);
+    printf("[SERVER] The client of the department %i executes the command: %s\n", senderDepartmentId, command);
+    printf("[SERVER] Response to client: %s\n", answer);
+  }
+
+}
+
+void sendReplyServer(int senderDepartmentId, char* command, char* answer, int operationResult) {
+
+  if (operationResult > 0) {
     printf("[SERVER] The client of the department %i executes the command: %s\n", senderDepartmentId, command);
     printf("[SERVER] Response to client: %s\n", answer);
   }
@@ -103,11 +118,11 @@ bool connectedClient(int idDepartment, int clients[]) {
   return false;
 }
 
-bool equalDepartment(int senderfd, int idDepartment, int clients[]) {
+bool equalDepartment(int givenSocketFd, int idDepartment, int arrayClients[]) {
 
   for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
 
-    if ((clients[i] == senderfd) && (i == idDepartment - 1)) {
+    if ((arrayClients[i] == givenSocketFd) && (i == idDepartment - 1)) {
       return true;
     }
 
@@ -203,45 +218,6 @@ void addClient(int acceptFd, int socketUdpFd, int *amountConnections, pthread_mu
 
   pthread_mutex_unlock(&lock);
 }
-
-// TODO: Modificar la descripcion
-// void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, int clients[]) {
-//   pthread_mutex_lock(&lock);
-//
-//   for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
-//
-//     /*
-//      * Si la celda i del arreglo de clientes o conexiones
-//      * esta libre, entonces se puede establecer la conexion
-//      * entre el servidor y un cliente, y se registra esta
-//      * conexion en la celda i del arreglo de clientes
-//      *
-//      * Una celda se considera libre si tiene el valor -1
-//      */
-//     if (clients[i] == FREE_CONNECTION) {
-//       /*
-//        * Registra el descriptor de archivo del socket
-//        * a traves del cual se hace la comunicacion
-//        * entre el hilo y un cliente
-//        */
-//       clients[i] = connectionfd;
-//
-//       /*
-//        * Se incrementa la cantidad de conexiones activas
-//        */
-//       (*amountConnections) = (*amountConnections) + 1;
-//
-//       /*
-//        * Una vez que se encontro un espacio libre en el arreglo
-//        * se tiene que cortar el ciclo
-//        */
-//       break;
-//     }
-//
-//   } // End for
-//
-//   pthread_mutex_unlock(&lock);
-// }
 
 void removeClient(int clients[], int connectionfd, int *amountConnections) {
 
@@ -376,10 +352,6 @@ int getFdSocketUdp(int acceptfd) {
   // Puerto efimero
   sudpaddr.sin_port = 0;
 
-  // printf("%s\n", "[SERVER] UDP data");
-  // printf("[SERVER] Port: %d\n", ntohs(sudpaddr.sin_port));
-  // printf("[SERVER] IP adress: %s\n", inet_ntoa(sudpaddr.sin_addr));
-
   /*
    * AF_INET y SOCK_DGRAM indican que este socket
    * usa IPv4 y datagramas respectivamente para hacer
@@ -408,4 +380,27 @@ int getFdSocketUdp(int acceptfd) {
   }
 
   return socketudpfd;
+}
+
+/**
+ * @param  givenSocketFd
+ * @return los datos (IP y puerto) del servidor asociados
+ * al descriptor de archivo de un socket
+ */
+struct sockaddr_in getDataServer(int givenSocketFd) {
+  struct sockaddr_in addrServer;
+  socklen_t len = sizeof(struct sockaddr_in);
+
+  /*
+   * Obtiene los datos del servidor asociados al descriptor
+   * de archivo (de un socket) pasado como argumento
+   */
+  int resultGetSockName = getsockname(givenSocketFd, (struct sockaddr *) &addrServer, &len);
+
+  if (resultGetSockName == -1) {
+    perror("getsockname");
+    exit(EXIT_FAILURE);
+  }
+
+  return addrServer;
 }

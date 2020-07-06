@@ -8,7 +8,12 @@ int sendResultClientUdp(int acceptfd, char* answer);
 
 int sendResultClient(int acceptfd, char* answer);
 
+int sendNoticeClientUdp(int senderUdpFd, char* answer, struct sockaddr_in addrSender);
+
+// TODO: Este sera borrado despues de implmentar sendReplyServer()
 void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite, int clients[]);
+
+void sendReplyServer(int senderDepartmentId, char* command, char* answer, int operationResult);
 
 void sendNoticeReceiver(int acceptfd, int receivingDepartmentId, char* answer);
 
@@ -20,7 +25,7 @@ bool existDepartment(int idDepartment);
 
 bool connectedClient(int idDepartment, int clients[]);
 
-bool equalDepartment(int senderfd, int idDepartment, int clients[]);
+bool equalDepartment(int givenSocketFd, int idDepartment, int arrayClients[]);
 
 void printConnections(int *amountConnections);
 
@@ -43,3 +48,10 @@ char convertIntToChar(int number);
 int getFdSocketTcp(char* ip, char* port);
 
 int getFdSocketUdp(int acceptfd);
+
+/**
+ * @param  givenSocketFd
+ * @return los datos (IP y puerto) del servidor asociados
+ * al descriptor de archivo de un socket
+ */
+struct sockaddr_in getDataServer(int givenSocketFd);

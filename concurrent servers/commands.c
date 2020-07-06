@@ -262,178 +262,140 @@ void callto(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, 
 /*
  * Comandos para la transmision y recepcion de audio
  */
-// void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[]) {
-// void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[], int clientsUdp[]) {
-void sendaudio(int senderUdpFd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int destinyDepartmentId, pthread_mutex_t lock, int clients[], int clientsUdp[],
-struct sockaddr_in addrReceiver) {
+void sendAudio(int senderUdpFd, bool* sendDefaultMessage, int destinyDepartmentId, pthread_mutex_t lock, struct sockaddr_in addrSender, struct sockaddr_in addrReceiver, int clientsUdp[]) {
+  int resultOperation;
 
   /*
    * Validaciones
-   * 1. Que el departamento del cliente con el cual
-   * se quiere hablar exista
-   * 2. Que el ID del departamento del cliente que quiere
-   * hablar con otro no sea igual al ID del departamento
-   * del cliente con el que se quiere hablar
-   * 3. Que el cliente con el que se queire hablar
-   * este conectado
-   */
-
-  /*
-   * Cosas a tener en cuenta
-   * Antes de establecer el chat entre los clientes
-   * se tiene que enviar un aviso al cliente
-   * receptor
+   * 1. Que el ID del departamento del cliente con el cual
+   * se quiere hablar no existe
    *
-   * Si el cliente receptor acepta la llamada se tiene
-   * que abrir el chat, en caso contrario no se tiene
-   * que abrir el chat
+   * 2. Que el ID del departamento sea igual al ID
+   * del departamento del cliente que quiere iniciar
+   * la conversacion
+   *
+   * 3. Que el cliente con el que se quiere hablar
+   * no este conectado
    */
-
-  socklen_t len = sizeof(struct sockaddr_in);
-  struct sockaddr_in addrsSender;
-
-  int receiverUdpFd = clientsUdp[destinyDepartmentId - 1];
-  printf("[SERVER] UDP FD of client sender: %d\n", senderUdpFd);
-  printf("[SERVER] UDP FD of client receiver: %d\n", receiverUdpFd);
-
-  printf("%s\n", "[SERVER] Datos del cliente receptor");
-  printf("[SERVER] Port: %d\n", ntohs(addrReceiver.sin_port));
-  printf("[SERVER] IP adress: %s\n", inet_ntoa(addrReceiver.sin_addr));
-
-  char buffer[BUF_SIZE] = S_AUDIO;
 
   /*
-   * Se le envia un aviso al cliente receptor de que alguien
-   * quiere hablar con el
+   * Obtiene el ID del departamento del cliente
+   * que inicia la conversacion
    */
-  int resultSendTo = sendto(receiverUdpFd, buffer, BUF_SIZE, 0, (struct sockaddr *) &addrReceiver, len);
+  int senderDepartmentId = getIdDepartment(clientsUdp, senderUdpFd);
 
-  if (resultSendTo == -1) {
-    perror("sendto");
-    exit(EXIT_FAILURE);
+  /*
+   * Comprueba que el ID del departamento recibido como
+   * argumento no exista, si no existe, se retorna el
+   * control a la funcion que invoco a sendAudio
+   */
+  if (!existDepartment(destinyDepartmentId)) {
+    resultOperation = sendNoticeClientUdp(senderUdpFd, ANSWER_NO_DEPARTMENT, addrSender);
+    sendReplyServer(senderDepartmentId, S_AUDIO, ANSWER_NO_DEPARTMENT, resultOperation);
+    return;
   }
 
-  printf("[SERVER][UDP] Notification S_AUDIO sended\n", "");
+  /*
+   * Comprueba que el ID del departamento recibido como
+   * argumento sea igual al ID del departamento del cliente
+   * que quiere iniciar la conversacion, si es asi, se retorna el
+   * control a la funcion que invoco a sendAudio
+   */
+  if (equalDepartment(senderUdpFd, destinyDepartmentId, clientsUdp)) {
+    resultOperation = sendNoticeClientUdp(senderUdpFd, ANSWER_EQUAL_DEPARTMENT, addrSender);
+    sendReplyServer(senderDepartmentId, S_AUDIO, ANSWER_EQUAL_DEPARTMENT, resultOperation);
+    return;
+  }
 
-  int numRead;
-  char bufferChat[BUF_SIZE];
+  /*
+   * Comprueba que el cliente con el cual se quiere hablar
+   * no este conectado, si es asi, se retorna el control a la
+   * funcion que invoco a sendAudio
+   */
+  if (!connectedClient(destinyDepartmentId, clientsUdp)) {
+    resultOperation = sendNoticeClientUdp(senderUdpFd, ANSWER_CLIENT_NOT_CONNECTED, addrSender);
+    sendReplyServer(senderDepartmentId, S_AUDIO, ANSWER_CLIENT_NOT_CONNECTED, resultOperation);
+    return;
+  }
 
-  printf("%s\n", "[SERVER][UDP] Ejecución del comando sendaudio");
+  /*
+   * Se le envia el aviso al cliente emisor de que su
+   * "mensaje" sendAudio fue enviado al cliente
+   * receptor
+   */
+  sendNoticeClientUdp(senderUdpFd, ANSWER_SENDER_SEND_AUDIO, addrSender);
 
-  for (;;) {
-    len = sizeof(struct sockaddr_in);
-    numRead = recvfrom(senderUdpFd, bufferChat, BUF_SIZE, 0, (struct sockaddr *) &addrsSender, &len);
-    printf("Received from sender: %s\n", bufferChat);
+  /*
+   * Obtiene el FD UDP del cliente receptor
+   */
+  int receiverUdpFd = clientsUdp[destinyDepartmentId - 1];
 
-    if (numRead == -1) {
-      fprintf(stderr, "%s\n", bufferChat);
-    }
+  char notification[BUF_SIZE];
+  concatenateTextNotification(notification, AUDIO_NOTICE_TO_RECEIVER_FIRST_PART, AUDIO_NOTICE_TO_RECEIVER_SECOND_PART, senderDepartmentId);
 
-    if (sendto(receiverUdpFd, bufferChat, numRead, 0, (struct sockaddr *) &addrReceiver, len) != numRead) {
-      fprintf(stderr, "%s\n", bufferChat);
-    }
+  /*
+   * Se le envia al cliente receptor una notificacion
+   * indicandole que alguien le envio un "audio"
+   */
+  sendNoticeClientUdp(receiverUdpFd, notification, addrReceiver);
 
-  } // End for
-
-  // if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
-  //   int resultWrite;
-  //
-  //   pthread_mutex_lock(&lock);
-  //   *sendDefaultMessage = false;
-  //   pthread_mutex_unlock(&lock);
-  //
-  //   // TODO: Documentar
-  //   if (!existDepartment(destinyDepartmentId)) {
-  //     printf("%s\n", "ENTRO");
-  //     resultWrite = sendResultClientUdp(senderfd, ANSWER_NO_DEPARTMENT);
-  //     // resultWrite = sendResultClient(senderfd, ANSWER_NO_DEPARTMENT);
-  //     sendResultServer(senderTcpFd, S_AUDIO, ANSWER_NO_DEPARTMENT, resultWrite, clients);
-  //     return;
-  //   }
-  //
-  //   // TODO: Documentar
-  //   if (equalDepartment(senderfd, destinyDepartmentId, clients)) {
-  //     // resultWrite = sendResultClient(senderfd, ANSWER_EQUAL_DEPARTMENT);
-  //     sendResultServer(senderTcpFd, S_AUDIO, ANSWER_EQUAL_DEPARTMENT, resultWrite, clients);
-  //     return;
-  //   }
-  //
-  //   // TODO: Documentar
-  //   if (!connectedClient(destinyDepartmentId, clients)) {
-  //     // resultWrite = sendResultClient(senderfd, ANSWER_CLIENT_NOT_CONNECTED);
-  //     sendResultServer(senderTcpFd, S_AUDIO, ANSWER_CLIENT_NOT_CONNECTED, resultWrite, clients);
-  //     return;
-  //   }
-  //
-  //   // TODO: Modificar
-  //   int senderDepartmentId = getIdDepartment(clients, senderTcpFd);
-  //   int receiverfd = clients[destinyDepartmentId - 1];
-  //
-  //   char notification[BUF_SIZE];
-  //   concatenateTextNotification(notification, AUDIO_NOTICE_TO_RECEIVER_FIRST_PART, AUDIO_NOTICE_TO_RECEIVER_SECOND_PART, senderDepartmentId);
-  //
-  //   // TODO: Documentar
-  //   sendNoticeReceiver(receiverfd, destinyDepartmentId, notification);
-  //
-  //   // TODO: Documentar
-  //   // resultWrite = sendResultClient(senderfd, ANSWER_SENDER_SEND_AUDIO);
-  //   sendResultServer(senderTcpFd, S_AUDIO, ANSWER_SENDER_SEND_AUDIO, resultWrite, clients);
-  // }
-
+  pthread_mutex_lock(&lock);
+  *sendDefaultMessage = false;
+  pthread_mutex_unlock(&lock);
 }
 
 void recaudio(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-    int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_REC_AUDIO);
-    sendResultServer(acceptfd, R_AUDIO, ANSWER_RECEIVER_REC_AUDIO, resultWrite, clients);
+  int resultWrite = sendResultClient(acceptfd, ANSWER_RECEIVER_REC_AUDIO);
+  sendResultServer(acceptfd, R_AUDIO, ANSWER_RECEIVER_REC_AUDIO, resultWrite, clients);
 
-    pthread_mutex_lock(&lock);
-    *sendDefaultMessage = false;
-    pthread_mutex_unlock(&lock);
+  pthread_mutex_lock(&lock);
+  *sendDefaultMessage = false;
+  pthread_mutex_unlock(&lock);
 }
 
 /*
  * Otros comandos
  */
- void id(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
-   char destiny[BUF_SIZE] = ANSWER_SENDER_ID;
-   char source[BUF_SIZE];
+void id(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
+  char destiny[BUF_SIZE] = ANSWER_SENDER_ID;
+  char source[BUF_SIZE];
 
-   /*
-    * Elimina la basura que haya en este bufer ya que
-    * al crearlo no es inicializado, con lo cual es
-    * probable que contenga datos basura
-    */
-   resetCharArray(source);
+  /*
+   * Elimina la basura que haya en este bufer ya que
+   * al crearlo no es inicializado, con lo cual es
+   * probable que contenga datos basura
+   */
+  resetCharArray(source);
 
-   int idDepartment = getIdDepartment(clients, acceptfd);
+  int idDepartment = getIdDepartment(clients, acceptfd);
 
-   /*
-    * Convierte entero a caracter
-    */
-   source[0] = idDepartment + '0';
+  /*
+   * Convierte entero a caracter
+   */
+  source[0] = idDepartment + '0';
 
-   /*
-    * Agrega \n para tener un salto de linea
-    */
-   source[1] = '\n';
+  /*
+   * Agrega \n para tener un salto de linea
+   */
+  source[1] = '\n';
 
-   /*
-    * Concatena el contenido de ambos arreglos
-    * de char y el resultado lo coloca en el primer
-    * arreglo de char que se pasa como argumento
-    *
-    * Concatena el valor de la constante
-    * ANSWER_SENDER_ID con el ID del departamento
-    */
-   strcat(destiny, source);
+  /*
+   * Concatena el contenido de ambos arreglos
+   * de char y el resultado lo coloca en el primer
+   * arreglo de char que se pasa como argumento
+   *
+   * Concatena el valor de la constante
+   * ANSWER_SENDER_ID con el ID del departamento
+   */
+  strcat(destiny, source);
 
-   int resultWrite = sendResultClient(acceptfd, destiny);
-   sendResultServer(acceptfd, ID, destiny, resultWrite, clients);
+  int resultWrite = sendResultClient(acceptfd, destiny);
+  sendResultServer(acceptfd, ID, destiny, resultWrite, clients);
 
-   pthread_mutex_lock(&lock);
-   *sendDefaultMessage = false;
-   pthread_mutex_unlock(&lock);
- }
+  pthread_mutex_lock(&lock);
+  *sendDefaultMessage = false;
+  pthread_mutex_unlock(&lock);
+}
 
 void ping(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]) {
   int resultWrite = sendResultClient(acceptfd, ANSWER_SENDER_PING);

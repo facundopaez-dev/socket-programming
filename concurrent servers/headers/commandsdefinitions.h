@@ -18,12 +18,8 @@ void takecall(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_m
 
 void callto(int senderfd, bool* sendDefaultMessage, const char* nameCommandBuf, int idDepartment, pthread_mutex_t lock, int clients[]);
 
-// Comandos para la transmision y recepcion de audio
-// void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int idDepartment, pthread_mutex_t lock, int clients[]);
-// void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int idDepartment, pthread_mutex_t lock, int clients[], int clientsUdp[]);
-void sendaudio(int senderfd, int senderTcpFd, bool* sendDefaultMessage, const char* nameCommandBuf, int idDepartment, pthread_mutex_t lock, int clients[], int clientsUdp[], struct sockaddr_in addr);
-
-void recaudio(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]);
+// Comandos para la transmision de audio
+void sendAudio(int senderUdpFd, bool* sendDefaultMessage, int destinyDepartmentId, pthread_mutex_t lock, struct sockaddr_in addrSender, struct sockaddr_in addrReceiver, int clientsUdp[]);
 
 // Otros comandos
 void id(int acceptfd, bool* sendDefaultMessage, const char* buf, pthread_mutex_t lock, int clients[]);

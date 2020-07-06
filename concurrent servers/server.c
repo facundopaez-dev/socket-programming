@@ -120,7 +120,6 @@ int main(int argc, char *argv[]) {
        * conexiones
        */
       if (resultPthreadCreate == 0) {
-        // addClient(acceptFd, &amountConnections, lock, clients);
         addClient(acceptFd, socketUdpFd, &amountConnections, lock, clients, clientsUdp);
         printConnections(&amountConnections);
       }
@@ -264,41 +263,46 @@ void *handleRequest(void *args) {
 
     if (strcmp(mode, UDP_MODE) == 0) {
       printf("%s\n", "[SERVER] UDP protocol in use");
-
-      struct sockaddr_in addr;
-      socklen_t len = sizeof(struct sockaddr_in);
-
-      printf("[SERVER] UDP socket's number: %d\n", socketUdpFd);
-      printf("%s\n", "");
+      // printf("[SERVER] UDP socket's number: %d\n", socketUdpFd);
+      // printf("%s\n", "");
 
       /*
-       * Obtiene los datos del servidor asociados al socket
-       * UDP creado previamente
+       * Obtiene los datos del servidor asociados al descriptor
+       * de archivo de un socket UDP
        */
-      int resultGetSockName = getsockname(socketUdpFd, (struct sockaddr *) &addr, &len);
+      struct sockaddr_in addrServer = getDataServer(socketUdpFd);
 
-      printf("%s\n", "[SERVER] Data server send to client");
-      printf("[SERVER] Puerto: %d\n", ntohs(addr.sin_port));
-      printf("[SERVER] Direccion: %s\n", inet_ntoa(addr.sin_addr));
-      printf("%s\n", "");
-
-      if (resultGetSockName == -1) {
-        perror("getsockname");
-        exit(EXIT_FAILURE);
-      }
+      // printf("%s\n", "[SERVER] Data server send to client");
+      // printf("[SERVER] Puerto: %d\n", ntohs(addrServer.sin_port));
+      // printf("[SERVER] Direccion: %s\n", inet_ntoa(addrServer.sin_addr));
+      // printf("%s\n", "");
 
       /*
        * El servidor le envia al cliente (mediante el socket TCP) los
        * datos del servidor asociados al socket UDP
        */
-      numWrite = write(acceptFd, (const void *) &addr, sizeof(addr));
+      numWrite = write(acceptFd, (const void *) &addrServer, sizeof(addrServer));
 
       if (numWrite == -1) {
         perror("write");
         exit(EXIT_FAILURE);
       }
 
-      // printf("[SERVER][UDP] nameCommandBuf content: %s\n", nameCommandBuf);
+      struct sockaddr_in addrSender;
+
+      /*
+       * El servidor recibe los datos del cliente emisor, los cuales
+       * son la direccion IP y puerto
+       */
+      numRead = read(acceptFd, (void *) &addrSender, sizeof(struct sockaddr_in));
+
+      // printf("[SERVER] Puerto emisor: %d\n", ntohs(addrSender.sin_port));
+      // printf("[SERVER] Direccion emisor: %s\n", inet_ntoa(addrSender.sin_addr));
+
+      if (numRead == -1) {
+        perror("read");
+        exit(EXIT_FAILURE);
+      }
 
       /*
        * Si el comando es para UDP, se tiene que ejecutar
@@ -322,11 +326,11 @@ void *handleRequest(void *args) {
          */
 
         int receiverTcpFd = clients[idDepartment - 1];
-        printf("Receiver TCP fd: %d\n", receiverTcpFd);
 
         /*
          * 1. Se le avisa al cliente receptor de que alguien quiere
-         * hablar con el
+         * hablar con el, esto lo hace para poder recibir los datos
+         * del cliente receptor
          */
         resultWrite = write(receiverTcpFd, S_AUDIO, BUF_SIZE);
 
@@ -348,16 +352,8 @@ void *handleRequest(void *args) {
           exit(EXIT_FAILURE);
         }
 
-        // sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
-        // sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients, clientsUdp);
-        sendaudio(socketUdpFd, acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients, clientsUdp, addrReceiver);
+        sendAudio(socketUdpFd, &sendDefaultMessage, idDepartment, lock, addrSender, addrReceiver, clientsUdp);
       }
-
-
-      // NOTE: Puede que este comando sea borrado
-      // if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
-      //   recaudio(acceptfd, &sendDefaultMessage, nameCommandBuf, lock, clients);
-      // }
 
     } // End if UDP_MODE
 

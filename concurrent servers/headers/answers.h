@@ -5,13 +5,11 @@
 #define ANSWER_SENDER_I_DISABLE "irrigation disabled\n"
 #define ANSWER_SENDER_EXIT "successful desconnection\n"
 #define ANSWER_SENDER_PING "I'm listening\n"
-#define ANSWER_SENDER_S_IMAGE "image sent\n"
 #define ANSWER_SENDER_CALL_TO "call sent\n"
 #define ANSWER_SENDER_SEND_AUDIO "audio sent\n"
 #define ANSWER_SENDER_ID "your ID is "
 
 // Respuestas para los receptores
-#define ANSWER_RECEIVER_R_IMAGE "image received\n"
 #define ANSWER_RECEIVER_TAKE_CALL "call taken\n"
 #define ANSWER_RECEIVER_REC_AUDIO "audio received\n"
 

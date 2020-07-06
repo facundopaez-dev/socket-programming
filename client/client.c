@@ -85,14 +85,14 @@ int main(int argc, char *argv[]) {
   pthread_t receiveResponseTcpThread;
   pthread_t receiveResponseUdpThread;
 
-  printf("Ejecucion de la funcion main\n", "");
+  // printf("Ejecucion de la funcion main\n", "");
 
   struct sockaddr_in addr;
   socklen_t len = sizeof(struct sockaddr_in);
 
   getsockname(params.socketUdpFd, (struct sockaddr *) &addr, &len);
-  printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
-  printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+  // printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
+  // printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
 
   resultSendThread = pthread_create(&sendRequestThread, NULL, sendRequest, (void *) &params);
   resultReceiveTcpThread = pthread_create(&receiveResponseTcpThread, NULL, receiveTcpResponse, (void *) &params);
@@ -411,8 +411,6 @@ void *sendRequest(void *args) {
      * Comandos: Audio
      */
     if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
-      printf("[CLIENT][RECEIVER][TCP] sendaudio command executed\n", "");
-
       strcat(sendBuffer, FIELD_UDP);
       strcat(sendBuffer, inputBuffer);
 
@@ -445,38 +443,31 @@ void *sendRequest(void *args) {
        */
       numRead = read(socketTcpFd, (void *) &addr, len);
 
-      printf("%s\n", "");
-      printf("%s\n", "[CLIENT] UDP data");
-      printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
-      printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+      // printf("%s\n", "");
+      // printf("%s\n", "[CLIENT] UDP data");
+      // printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
+      // printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+
+      struct sockaddr_in addrClient;
 
       /*
-       * Recibe lo que se ingresa por teclado y lo envia al
-       * servidor con el que esta conectado
+       * Obtiene los datos de este cliente asociados al descriptor
+       * de archivo de un socket TCP
        */
-      for (;;) {
-        numRead = read(0, sendBuffer, BUF_SIZE);
+      getsockname(socketTcpFd, (struct sockaddr *) &addrClient, &len);
 
-        len = sizeof(addr);
+      /*
+       * Este cliente le envia al servidor (por TCP) sus datos
+       */
+      numWrite = write(socketTcpFd, (void *) &addrClient, len);
 
-        if (numRead == -1) {
-          fprintf(stderr, "%s\n", sendBuffer);
-        }
-
-        if (sendto(socketUdpFd, sendBuffer, numRead, 0, (struct sockaddr *) &addr, len) != numRead) {
-          fprintf(stderr, "%s\n", sendBuffer);
-        }
-
+      if (numWrite == -1) {
+        perror("write");
+        exit(EXIT_FAILURE);
       }
 
       sendInvalidCommand = false;
     }
-
-    // NOTE: Puede que este comando sea borrado
-    // if (strcmp(nameCommandBuf, R_AUDIO) == 0) {
-    //   numWrite = write(socketTcpFd, nameCommandBuf, strlen(nameCommandBuf) + 1);
-    //   sendInvalidCommand = false;
-    // }
 
     /*
      * Si la variable booleana sendInvalidCommand es verdadera
@@ -516,7 +507,6 @@ void *receiveTcpResponse(void *args) {
   int numRead;
   int numWrite;
   int socketTcpFd = params -> socketTcpFd;
-  int resultRecv;
 
   char outputBuffer[BUF_SIZE];
 
@@ -528,89 +518,11 @@ void *receiveTcpResponse(void *args) {
       exit(EXIT_FAILURE);
     }
 
-    if (strcmp(outputBuffer, S_IMAGE) == 0) {
-      /*
-       * 2. El cliente, en esta linea de codigo fuente, recibe la
-       * confirmacion de parte del servidor de si tiene o no
-       * un archivo para la transferencia
-       */
-      numRead = read(socketTcpFd, outputBuffer, BUF_SIZE);
-
-      if (numRead == -1) {
-        perror("read");
-        exit(EXIT_FAILURE);
-      }
-
-      /*
-       * El cliente comprueba si lo que recibio de parte
-       * del servidor es la confirmacion positiva de la
-       * existencia de un archivo
-       */
-      if (strcmp(outputBuffer, EXISTING_FILE) == 0) {
-        off_t fileSize;
-        char buffer[BUF_SIZE];
-
-        int bytesReceived = 0;
-        int flags = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
-        int fileFd = open(FILE_NAME, O_CREAT | O_TRUNC | O_WRONLY, flags);
-
-        /*
-         * 3. El cliente recibe del servidor el tamaño del archivo
-         * que va a recibir
-         */
-        resultRecv = recv(socketTcpFd, &fileSize, sizeof(fileSize), 0);
-
-        if (resultRecv == -1) {
-          perror("recv");
-          exit(EXIT_FAILURE);
-        }
-
-        fileSize = ntohl(fileSize);
-        printf("[CLIENT][TCP] File size received: %ld\n", fileSize);
-
-        /*
-         * 4. El cliente recibe de parte del servidor los
-         * bytes del archivo, en este parte del codigo fuente
-         * es en donde inicia la transferencia del archivo
-         * desde al servidor a este cliente
-         */
-        while (bytesReceived < fileSize) {
-          resultRecv = recv(socketTcpFd, buffer, BUF_SIZE, 0);
-
-          if (resultRecv == -1) {
-            perror("recv");
-            exit(EXIT_FAILURE);
-          }
-
-          write(fileFd, buffer, resultRecv);
-          bytesReceived += resultRecv;
-
-          if (bytesReceived == fileSize) {
-            break;
-          }
-
-        }
-
-        printf("[CLIENT][TCP] File transfer completed\n", "");
-        close(fileFd);
-      } // Enf if EXISTING_FILE
-
-      /*
-       * El cliente comprueba si lo que recibio de parte
-       * del servidor es la confirmacion negativa de la
-       * existencia de un archivo
-       */
-      if (strcmp(outputBuffer, NONEXISTING_FILE) == 0) {
-        printf("[CLIENT] The server doesn't have a file\n", "");
-      }
-
-    } // End if S_IMAGE
-
     if (strcmp(outputBuffer, S_AUDIO) == 0) {
-      printf("[CLIENT][RECEIVER][TCP] Recibó la notificación de parte del servidor de que alguien quiere hablar conmigo mediante UDP\n", "");
-      printf("[CLIENT][RECEIVER][TCP] Lo que voy a hacer es enviarle al servidor mi IP y puerto\n", "");
+      // printf("[CLIENT][RECEIVER][TCP] Recibó la notificación de parte del servidor de que alguien quiere hablar conmigo mediante UDP\n", "");
+      // printf("[CLIENT][RECEIVER][TCP] Lo que voy a hacer es enviarle al servidor mi IP y puerto\n", "");
       struct sockaddr_in addr;
-      socklen_t len = sizeof(addr);
+      socklen_t len = sizeof(struct sockaddr_in);
 
       int resultGetSockName = getsockname(socketTcpFd, (struct sockaddr *) &addr, &len);
 
@@ -619,9 +531,9 @@ void *receiveTcpResponse(void *args) {
         exit(EXIT_FAILURE);
       }
 
-      printf("[CLIENT][RECEIVER][TCP] Mis datos son:\n", "");
-      printf("[CLIENT][RECEIVER][TCP] Port: %d\n", ntohs(addr.sin_port));
-      printf("[CLIENT][RECEIVER][TCP] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+      // printf("[CLIENT][RECEIVER][TCP] Mis datos son:\n", "");
+      // printf("[CLIENT][RECEIVER][TCP] Port: %d\n", ntohs(addr.sin_port));
+      // printf("[CLIENT][RECEIVER][TCP] IP adress: %s\n", inet_ntoa(addr.sin_addr));
 
       /*
        * El cliente receptor le envia al servidor (mediante el socket TCP)
@@ -634,7 +546,7 @@ void *receiveTcpResponse(void *args) {
         exit(EXIT_FAILURE);
       }
 
-      printf("[CLIENT][RECEIVER][TCP] IP y puerto enviados al servidor\n", "");
+      // printf("[CLIENT][RECEIVER][TCP] IP y puerto enviados al servidor\n", "");
     } // End if S_AUDIO
 
     printf("[CLIENT][TCP] Response from server: %s\n", outputBuffer);
@@ -667,49 +579,29 @@ void *receiveUdpResponse(void *args) {
 
   char outputBuffer[BUF_SIZE];
 
-  int resultGetSockName = getsockname(socketUdpFd, (struct sockaddr *) &addr, &len);
-
-  printf("[CLIENT][UDP] Se ejecuta, en un hilo, la funcion receiveUdpResponse\n", "");
-  printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
-  printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
-
-  if (resultGetSockName == -1) {
-    perror("getsockname");
-    exit(EXIT_FAILURE);
-  }
-
+  // int resultGetSockName = getsockname(socketUdpFd, (struct sockaddr *) &addr, &len);
+  //
+  // printf("[CLIENT][UDP] Se ejecuta, en un hilo, la funcion receiveUdpResponse\n", "");
+  // printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
+  // printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
+  //
+  // if (resultGetSockName == -1) {
+  //   perror("getsockname");
+  //   exit(EXIT_FAILURE);
+  // }
 
   // len = sizeof(addr);
 
   for(;;) {
-    len = sizeof(addr);
+    len = sizeof(struct sockaddr_in);
     numRead = recvfrom(socketUdpFd, outputBuffer, BUF_SIZE, 0, (struct sockaddr *) &addr, &len);
-    // outputBuffer[numRead - 1] = '\0';
 
     if (numRead == -1) {
       perror("read");
       exit(EXIT_FAILURE);
     }
 
-    if (strcmp(outputBuffer, S_AUDIO) == 0) {
-      printf("%s\n", "[CLIENT][RECEIVER][UDP] Notification received");
-    }
-
     printf("[CLIENT][RECEIVER][UDP] Response from server: %s\n", outputBuffer);
-
-    /*
-     * Si se llega al limite de conexiones del servidor, este
-     * envia, al cliente que se quiere conectar, el mensaje
-     * "Connection limit reached, try again later", con lo cual
-     * se tiene que comprobar que el arreglo de caracteres outputBuffer
-     * contiene este mensaje para evitar que dicho cliente se quede
-     * en un bucle infinito escribiendo por pantalla el contenido
-     * de outputBuffer
-     */
-    // if (strcmp(outputBuffer, ANSWER_LIMIT_CONNECTIONS) == 0) {
-    //   exit(EXIT_SUCCESS);
-    // }
-
   } // End for
 
 }

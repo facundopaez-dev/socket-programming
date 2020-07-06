@@ -101,16 +101,11 @@ int getFdSocketUdp(int socketTcpFd) {
     exit(EXIT_FAILURE);
   }
 
-  /*
-   * No es necesario usar la llamada al sistema bind() en
-   * el programa cliente, pero sí lo es en el programa
-   * servidor
-   */
   bindUdpFd = bind(socketUdpFd, (struct sockaddr*) &addrUdp, addrlenUdp);
 
-  printf("[CLIENT][UDP] Se ejecuta el bind()\n", "");
-  printf("[CLIENT] Port: %d\n", ntohs(addrUdp.sin_port));
-  printf("[CLIENT] IP adress: %s\n", inet_ntoa(addrUdp.sin_addr));
+  // printf("[CLIENT][UDP] Se ejecuta el bind()\n", "");
+  // printf("[CLIENT] Port: %d\n", ntohs(addrUdp.sin_port));
+  // printf("[CLIENT] IP adress: %s\n", inet_ntoa(addrUdp.sin_addr));
 
   if (bindUdpFd == -1) {
     perror("Bind error: Could not bind server socket");
