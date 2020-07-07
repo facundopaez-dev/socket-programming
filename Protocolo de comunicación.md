@@ -11,7 +11,6 @@ Un cliente puede realizar las siguientes solicitudes al servidor:
 - Hacer una llamada al portero eléctrico.  
 - Contestar una llamada del portero eléctrico.
 - Enviar audio al portero eléctrico.  
-- Recibir audio del portero eléctrico.  
 - Solicitar ID (identificador).  
 - Desconectarse del servidor.
 - Comprobar si el servidor está en funcionamiento.
@@ -25,7 +24,6 @@ Para esto se dispondrá de los siguientes comandos:
 - callto para llamar al portero eléctrico haciendo uso de un número de departamento.
 - takecall para contestar una llamada del portero eléctrico.
 - sendaudio para enviar audio al portero eléctrico haciendo uso de un número de departamento.
-- recaudio para recibir audio del portero eléctrico.
 - id para saber el ID propio.
 - exit para desconectarse del servidor.
 - ping para comprobar si el servidor está en funcionamiento.
@@ -45,8 +43,6 @@ Para esto se dispondrá de los siguientes comandos:
 **takecall** retorna al receptor el mensaje "call (number) taken" en caso de que haya un cliente llamando al portero eléctrico, en caso contrario retorna el mensaje "no incoming calls".  
 
 **sendaudio** utiliza como argumento el número de departamento del cliente al que se quiere enviar audio. En el caso en el cual existe el número de departamento y el cliente solicitado esté conectado retorna al emisor el mensaje "audio sent", mientras que al receptor se le envía un **aviso** con el siguiente mensaje "the client of the department (number) sent you an audio".  
-
-**recaudio** retorna al receptor el mensaje "audio (number) received" en caso de que haya un audio disponible para escuchar, en caso contrario retorna el mensaje "there are no audios to listen".  
 
 Para los comandos callto y sendaudio:
 - En el caso en el cual no existe el número de departamento se devuelve el mensaje "department number does not exist".
