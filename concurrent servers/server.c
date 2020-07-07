@@ -18,17 +18,11 @@
 #define IP "127.0.0.1"
 #define PORT "50001"
 
-/* Este arreglo contiene los FD de cada socket usado por cada cliente */
+/* Este arreglo contiene el descriptor de archivo del socket TCP usado por cada cliente */
 int clients[CONNECTION_LIMIT];
-int clientsUdp[CONNECTION_LIMIT];
 
-/*
- * Variable global utilizada para enviar un mensaje
- * por defecto cuando el comando ingresado por el
- * cliente no coincide con ninguno de los que estan
- * disponibles
- */
-bool sendDefaultMessage;
+/* Este arreglo contiene el descriptor de archivo del socket UDP usado por cada cliente */
+int clientsUdp[CONNECTION_LIMIT];
 
 /*
  * Variable global utilizada para terminar la ejecucion
@@ -53,9 +47,6 @@ struct structparams {
   int *amountConnections;
 };
 
-// TODO: Crear archivo de configuracion que contenga el puerto y la IP
-
-/* Handle a client request: copy socket input back to socket */
 void *handleRequest(void *args);
 
 int main(int argc, char *argv[]) {
@@ -152,7 +143,13 @@ int main(int argc, char *argv[]) {
 
 } // End main
 
-/* Handle a client request: copy socket input back to socket */
+/**
+ * Esta funcion tiene la responsabilidad de manejar las solicitudes
+ * de los clientes conectados a este servidor
+ *
+ * @param  args [se utiliza una estructura como argumento de esta funcion]
+ * @return
+ */
 void *handleRequest(void *args) {
   struct structparams *params = (struct structparams *) args;
 
@@ -162,14 +159,24 @@ void *handleRequest(void *args) {
   int resultWrite = 0;
 
   char buf[BUF_SIZE] = "";
+
+  /*
+   * Se utiliza para almacenar la cadena de
+   * caracteres que representa el modo de
+   * operacion: TCP, UDP
+   */
   char mode[BUF_SIZE] = "";
+
+  /*
+   * Se utiliza para almacenar el nombre del
+   * comando ejecutado por un cliente
+   */
   char nameCommandBuf[BUF_SIZE] = "";
 
   ssize_t numWrite = 0;
   ssize_t numRead = 0;
 
   pthread_mutex_lock(&lock);
-  sendDefaultMessage = true;
   disconnection = false;
   pthread_mutex_unlock(&lock);
 
@@ -205,10 +212,6 @@ void *handleRequest(void *args) {
     // printf("%s\n", nameCommandBuf);
     // printf("%d\n", idDepartment);
 
-    // Comprobar el protocolo a utilizar
-    // Si el protocolo a utilizar es TCP, usar el FD de TCP
-    // Si el protocolo a utilizar es UDP, usar el FD de UDP
-
     if (strcmp(mode, TCP_MODE) == 0) {
       printf("%s\n", "[SERVER] TCP protocol in use");
 
@@ -220,43 +223,43 @@ void *handleRequest(void *args) {
        * llamada, ping y id
        */
       if (strcmp(nameCommandBuf, TURN_ON) == 0) {
-        turnon(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        turnon(acceptFd, clients);
       }
 
       if(strcmp(nameCommandBuf, TURN_OFF) == 0) {
-        turnoff(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        turnoff(acceptFd, clients);
       }
 
       if(strcmp(nameCommandBuf, I_ENABLE) == 0) {
-        ienable(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        ienable(acceptFd, clients);
       }
 
       if(strcmp(nameCommandBuf, I_DISABLE) == 0) {
-        idisable(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        idisable(acceptFd, clients);
       }
 
       if (strcmp(nameCommandBuf, R_IMAGE) == 0) {
-        rimage(acceptFd, &sendDefaultMessage, lock, clients);
+        rimage(acceptFd, clients);
       }
 
       if(strcmp(nameCommandBuf, EXIT) == 0) {
-        disconnect(acceptFd, &sendDefaultMessage, &disconnection, nameCommandBuf, params -> amountConnections, lock, clients);
+        disconnect(acceptFd, &disconnection, params -> amountConnections, lock, clients, clientsUdp);
       }
 
       if(strcmp(nameCommandBuf, PING) == 0) {
-        ping(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        ping(acceptFd, clients);
       }
 
       if(strcmp(nameCommandBuf, ID) == 0) {
-        id(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        id(acceptFd, clients);
       }
 
       if (strcmp(nameCommandBuf, CALL_TO) == 0 ) {
-        callto(acceptFd, &sendDefaultMessage, nameCommandBuf, idDepartment, lock, clients);
+        callto(acceptFd, idDepartment, clients);
       }
 
       if (strcmp(nameCommandBuf, TAKE_CALL) == 0) {
-        takecall(acceptFd, &sendDefaultMessage, nameCommandBuf, lock, clients);
+        takecall(acceptFd, clients);
       }
 
     } // End if TCP_MODE
@@ -278,8 +281,8 @@ void *handleRequest(void *args) {
       // printf("%s\n", "");
 
       /*
-       * El servidor le envia al cliente (mediante el socket TCP) los
-       * datos del servidor asociados al socket UDP
+       * El servidor le envia al cliente (mediante el socket TCP) emisor
+       * los datos del servidor asociados al socket UDP
        */
       numWrite = write(acceptFd, (const void *) &addrServer, sizeof(addrServer));
 
@@ -352,20 +355,21 @@ void *handleRequest(void *args) {
           exit(EXIT_FAILURE);
         }
 
-        sendAudio(socketUdpFd, &sendDefaultMessage, idDepartment, lock, addrSender, addrReceiver, clientsUdp);
+        sendAudio(socketUdpFd, idDepartment, addrSender, addrReceiver, clientsUdp);
       }
 
     } // End if UDP_MODE
 
+    /*
+     * Si lo recibido por el servidor de parte del cliente
+     * emisor contiene la cadena de caracteres "invalid command", el
+     * servidor le envia al cliente emisor el mensaje
+     * "invalid command", siendo dicho cliente el que
+     * causo dicho envio
+     */
     if (strcmp(buf, INVALID_COMMAND_NOTICE) == 0) {
       invalidCommand(acceptFd, clients);
     }
-
-    // Comprobar la cadena de comando invalido
-    // Si viene la cadena de comando invalido
-    // Retornar el mensaje de comando invalido
-    // y mostrar en el servidor la cadena de texto
-    // que es un comando invalido
 
     pthread_mutex_lock(&lock);
 

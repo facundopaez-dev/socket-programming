@@ -2,6 +2,7 @@
 #define TURN_OFF "turnoff"
 #define I_ENABLE "ienable"
 #define I_DISABLE "idisable"
+#define S_IMAGE "simage"
 #define R_IMAGE "rimage"
 #define CALL_TO "callto"
 #define TAKE_CALL "takecall"

@@ -11,18 +11,19 @@
 #include "headers/answers.h"
 #include "headers/utildefinitions.h"
 
-// TODO: Documentar lo que falte documentar
-
-// int sendResultClientUdp(int fd, char* answer, int numRead, const struct sockaddr *claddr, socklen_t len) {
+/**
+ * Esta funcion tiene la responsabilidad de enviarle a un cliente
+ * el resultado del comando que haya ejecutado mediante UDP
+ *
+ * @param  fd     [descriptor de archivo de un socket UDP]
+ * @param  answer [buffer que contiene la respuesta de ejecutar un comando]
+ * @return el resultado de la instruccion sendto
+ */
 int sendResultClientUdp(int fd, char* answer) {
-  socklen_t len;
-  struct sockaddr_storage claddr;
+  socklen_t len = sizeof(struct sockaddr_in);
+  struct sockaddr_in addr;
 
-  len = sizeof(struct sockaddr_storage);
-
-  char buf[BUF_SIZE];
-
-  int resultSend = sendto(fd, buf, BUF_SIZE, 0, (struct sockaddr *) &claddr, len);
+  int resultSend = sendto(fd, answer, BUF_SIZE, 0, (struct sockaddr *) &addr, len);
 
   if (resultSend == -1) {
     perror("send");
@@ -32,14 +33,44 @@ int sendResultClientUdp(int fd, char* answer) {
   return resultSend;
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de enviarle a un cliente
+ * el resultado del comando que haya ejecutado mediante TCP
+ *
+ * @param  acceptfd [descriptor de archivo de un socket TCP]
+ * @param  answer   [buffer que contiene la respuesta de ejecutar un comando]
+ * @return el resultado de la instruccion write
+ */
 int sendResultClient(int acceptfd, char* answer) {
   return write(acceptfd, answer, strlen(answer) + 1);
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de enviarle a un cliente
+ * el resultado del comando que haya ejecutado mediante UDP
+ *
+ * @param  senderUdpFd [descriptor de archivo de un socket UDP]
+ * @param  answer      [buffer que contiene la respuesta de ejecutar un comando]
+ * @param  addrSender  [estructura que contiene la IP y el puerto de un cliente que usa UDP]
+ * @return el resultado de la instruccion sendto
+ */
 int sendNoticeClientUdp(int senderUdpFd, char* answer, struct sockaddr_in addrSender) {
   return sendto(senderUdpFd, answer, BUF_SIZE, 0, (struct sockaddr *) &addrSender, sizeof(struct sockaddr_in));
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de mostrar en la pantalla
+ * del servidor el resultado de ejecutar un comando, dicho resultado
+ * tiene: El ID del departamento del cliente que ejecuto un comando,
+ * el nombre del comando ejecutado por dicho cliente y la respuesta
+ * de parte del servidor hacia dicho cliente
+ *
+ * @param acceptfd    [descriptor de archivo de un socket TCP]
+ * @param command     [buffer que contiene el nombre del comando ejecutado por un cliente]
+ * @param answer      [buffer que contiene la respuesta de haber ejecutado un comando]
+ * @param resultWrite [variable que contiene el resultado de una instruccion write]
+ * @param clients     [arreglo que contiene el descriptor de archivo de cada socket TCP usado para las conexiones de los clientes]
+ */
 void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite, int clients[]) {
 
   if (resultWrite > 0) {
@@ -50,6 +81,18 @@ void sendResultServer(int acceptfd, char* command, char* answer, int resultWrite
 
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de mostrar en la pantalla
+ * del servidor el resultado de ejecutar un comando, dicho resultado
+ * tiene: El ID del departamento del cliente que ejecuto un comando,
+ * el nombre del comando ejecutado por dicho cliente y la respuesta
+ * de parte del servidor hacia dicho cliente
+ *
+ * @param senderDepartmentId [ID del departamento del cliente que ejecuto un comando]
+ * @param command            [buffer que contiene el nombre del comando ejecutado por un cliente]
+ * @param answer             [buffer que contiene la respuesta de haber ejecutado un comando]
+ * @param operationResult    [variable que contiene el resultado de ejecutar una instruccion write o sendto]
+ */
 void sendReplyServer(int senderDepartmentId, char* command, char* answer, int operationResult) {
 
   if (operationResult > 0) {
@@ -59,6 +102,15 @@ void sendReplyServer(int senderDepartmentId, char* command, char* answer, int op
 
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de enviarle una notificacion
+ * al cliente receptor indicandole que un cliente emisor realizo una
+ * acccion sobre el (como una llamada, por ejemplo)
+ *
+ * @param acceptfd              [descriptor de archivo de un socket TCP]
+ * @param receivingDepartmentId [ID del departamento del cliente receptor]
+ * @param notice                [buffer que contiene la notificacion]
+ */
 void sendNoticeReceiver(int acceptfd, int receivingDepartmentId, char* notice) {
   if (write(acceptfd, notice, strlen(notice) + 1) >= 0) {
     printf("[SERVER] Notification for customer %i: %s\n", receivingDepartmentId, notice);
@@ -69,6 +121,14 @@ void invalidCommand(int acceptfd, int clients[]) {
   responseInvalidCommand(acceptfd, clients);
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de mostrar en
+ * la pantalla del servidor la ejecucion de un comando
+ * invalido
+ *
+ * @param acceptfd [descriptor de archivo de un socket TCP]
+ * @param clients  [arreglo que contiene el descriptor de archivo de cada socket TCP usado para las conexiones de los clientes]
+ */
 void responseInvalidCommand(int acceptfd, int clients[]) {
 
   if (write(acceptfd, ANSWER_INVALID_COMMAND, BUF_SIZE) >= 0) {
@@ -79,6 +139,16 @@ void responseInvalidCommand(int acceptfd, int clients[]) {
 
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de comprobar si
+ * un departamento existe o no, lo cual se hace comprobando
+ * si el ID (provisto por un cliente) del dapartamento esta
+ * entre 1 y el limite de conexiones del servidor
+ *
+ * @param  idDepartment [ID del departamento provisto por un cliente]
+ * @return verdadero en caso de que existe el departamento, en caso
+ * constrario falso
+ */
 bool existDepartment(int idDepartment) {
   /*
    * El ID del departamento es el numero de la posicion, del arreglo
@@ -103,6 +173,24 @@ bool existDepartment(int idDepartment) {
   return false;
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de comprobar si un
+ * cliente esta conectado al servidor, para esto hace uso
+ * del ID de un dapartamento
+ *
+ * Si en la posicion indicada por ID - 1 en el arreglo clients
+ * hay un numero distintos de -1 es porque hay un cliente conectado
+ * en el departamento que tiene el ID dado
+ *
+ * Si en la posicion indicada por ID - 1 en el arreglo clients
+ * hay un numero igual a -1 es porque no hay un cliente conectado
+ * en el departamento que tiene el ID dado
+ *
+ * @param  idDepartment [ID de un departamento]
+ * @param  clients      [arreglo que contiene el descriptor de archivo de cada socket TCP usado para las conexiones de los cliente]
+ * @return verdadero si el cliente esta conectado, en caso
+ * contrario falso
+ */
 bool connectedClient(int idDepartment, int clients[]) {
   /*
    * Si el contenido de la posicion indicada por
@@ -118,10 +206,29 @@ bool connectedClient(int idDepartment, int clients[]) {
   return false;
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de comprobar si
+ * el ID (provisto por un cliente) de un departamento es
+ * igual al ID del departamento en el cual se encuentra
+ * conectado el cliente que provee el ID
+ *
+ * @param  givenSocketFd [descriptor de archivo de un socket TCP]
+ * @param  idDepartment  [ID de un departamento provisto por un cliente]
+ * @param  arrayClients  [arreglo que contiene el descriptor de archivo, sea de TCP o UDP, de cada cliente conectado al servidor]
+ * @return verdadero si ID del departamento es igual al ID del departamento
+ * que proveyo el ID, en caso contrario falso
+ */
 bool equalDepartment(int givenSocketFd, int idDepartment, int arrayClients[]) {
 
   for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
 
+    /*
+     * Comprueba si el descriptor de archivo dado (perteneciente
+     * a un cliente) esta en el arreglo de clientes y si lo esta
+     * comprueba que la posicion en la cual se encuentre el
+     * descriptor de archivo sea igual al ID del departamento
+     * provisto por un cliente
+     */
     if ((arrayClients[i] == givenSocketFd) && (i == idDepartment - 1)) {
       return true;
     }
@@ -142,14 +249,21 @@ void printConnections(int *amountConnections) {
  * del socket con el que se establecio la conexion entre
  * un cliente y el servidor
  *
- * @param  clients
- * @param  acceptfd
+ * @param  clients  [arreglo que contiene el descriptor de archivo de cada socket TCP usado para las conexiones de los cliente]
+ * @param  acceptfd [descriptor de archivo de un socket TCP]
  * @return ID del departamento del cliente asociado
  * al descriptor de archivo contenido en la variable
  * entera acceptfd
  */
 int getIdDepartment(int clients[], int acceptfd) {
-
+  /*
+   * Comprueba si en la posicion i, del arreglo que contiene
+   * los descriptores de archivo TCP de los clientes, esta
+   * el descriptor de archivo del socket TCP provisto como
+   * argumento, si es asi se suma 1 al valor de i, retornando
+   * el ID del departamento en el cual se encuentra el cliente
+   * que tiene el descriptor de archivo TCP dado
+   */
   for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
     if (clients[i] == acceptfd) {
       return i + 1;
@@ -179,7 +293,18 @@ void resetCharArray(char buf[]) {
  * @param  amountConnections [cantidad de conexiones activas]
  * @return cantidad de conexiones activas
  */
-
+/**
+ * Esta funcion tiene la responsabilidad de registrar en los arreglos de
+ * descriptores de archivo TCP y UDP, el descriptor de archivo TCP y UDP
+ * de cada cliente que se conecta a este servidor
+ *
+ * @param acceptFd          [descriptor de archivo de un socket TCP]
+ * @param socketUdpFd       [descriptor de archivo de un socket UDP]
+ * @param amountConnections [variable que representa la cantidad de clientes conectados que tiene el servidor]
+ * @param lock              [variable utilizada para la exclusion mutua de los recursos compartidos por los hilos]
+ * @param clients           [arreglo que contiene el descriptor de archivo de cada socket TCP usado para las conexiones de los client]
+ * @param clientsUdp        [arreglo que contiene el descriptor de archivo de cada socket UDP usado para las conexiones de los client]
+ */
 void addClient(int acceptFd, int socketUdpFd, int *amountConnections, pthread_mutex_t lock, int clients[], int clientsUdp[]) {
   pthread_mutex_lock(&lock);
 
@@ -219,12 +344,38 @@ void addClient(int acceptFd, int socketUdpFd, int *amountConnections, pthread_mu
   pthread_mutex_unlock(&lock);
 }
 
-void removeClient(int clients[], int connectionfd, int *amountConnections) {
+/**
+ * Esta funcion tiene la responsabilidad de eliminar los descriptores
+ * de archivo TCP y UDP (de los arreglos clients y clientsUdp) del cliente
+ * que ha ejecutado el comando exit, el cual es para desconectarse del servidor
+ *
+ * @param clients           [arreglo que contiene el descriptor de archivo de cada socket TCP usado para las conexiones de los client]
+ * @param clientsUdp        [arreglo que contiene el descriptor de archivo de cada socket UDP usado para las conexiones de los client]
+ * @param connectionfd      [descriptor de archivo TCP de un cliente que se ha desconectado del servidor]
+ * @param amountConnections [cantidad de clientes conectados a este servidor]
+ */
+void removeClient(int clients[], int clientsUdp[], int connectionfd, int *amountConnections) {
 
   for (size_t i = 0; i < CONNECTION_LIMIT; i++) {
 
+    /*
+     * Comprueba si en la posicion i del arreglo que
+     * contiene los descriptores de archivo TCP esta
+     * el descriptor de archivo dado, si es asi se
+     * coloca en la posicion i de los arreglos
+     * clients y clientsUdp el valor -1, el cual
+     * esta contenido en la constante FREE_CONNECTION
+     * y representa que en el departamento i no
+     * hay un cliente conectado
+     */
     if (clients[i] == connectionfd) {
       clients[i] = FREE_CONNECTION;
+      clientsUdp[i] == FREE_CONNECTION;
+
+      /*
+       * Se decrementa la cantidad de conexiones que hay
+       * en este servidor
+       */
       (*amountConnections) = (*amountConnections) - 1;
 
       /*
@@ -238,6 +389,18 @@ void removeClient(int clients[], int connectionfd, int *amountConnections) {
 
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de armar la notificacion
+ * con las cadenas de caracteres que se pasan como argumento y el
+ * ID del departamento del cliente emisor
+ *
+ * Esta notificacion es para el cliente receptor
+ *
+ * @param notification           [buffer que contiene la notificacion]
+ * @param firstPartNotification  [buffer que contiene la primera parte de la notificacion]
+ * @param secondPartNotification [buffer que contiene la segunda parte de la notificacion]
+ * @param senderDepartmentId     [ID del departamento del cliente emisor]
+ */
 void concatenateTextNotification(char* notification, char* firstPartNotification, char* secondPartNotification, int senderDepartmentId) {
   char charIdDepartment[BUF_SIZE];
 
@@ -265,18 +428,16 @@ void concatenateTextNotification(char* notification, char* firstPartNotification
 }
 
 /**
- * Carga el arreglo dado con el vañor -1 para indicar
- * que no hay clientes conectados al servidor, o en
- * otras palabras que no hay conexiones abiertas
+ * Esta funcion tiene la responsabilidad de cargar el arreglo
+ * que se le pasa como argumento con el valor -1, el cual
+ * representa que no hay un cliente conectado
  *
- * @param clients [int array]
+ * @param arrayClients [arreglo que contiene el descriptor de archivo, sea de TCP o UDP, de cada cliente conectado al servidor]
  */
-
-// TODO: Modificar descripcion, y añadir el signifcado de -1
-void fill(int clients[]) {
+void fill(int arrayClients[]) {
 
   for (size_t j = 0; j < CONNECTION_LIMIT; j++) {
-    clients[j] = -1;
+    arrayClients[j] = -1;
   }
 
 }
@@ -285,6 +446,14 @@ char convertIntToChar(int number) {
   return number + '0';
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de crear un socket TCP
+ * dado una IP y un puerto
+ *
+ * @param  ip
+ * @param  port
+ * @return el descriptor de archivo del socket TCP creado
+ */
 int getFdSocketTcp(char* ip, char* port) {
   int sockettcpfd;
   int bindtcpfd;
@@ -336,6 +505,13 @@ int getFdSocketTcp(char* ip, char* port) {
   return sockettcpfd;
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de crear un socket UDP
+ * usando el descriptor de archivo de un socket TCP
+ *
+ * @param  acceptfd [descriptor de archivo de un socket TCP]
+ * @return el descriptor de archivo de un socket UDP
+ */
 int getFdSocketUdp(int acceptfd) {
   int socketudpfd;
   int bindudpfd;

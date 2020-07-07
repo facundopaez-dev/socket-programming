@@ -31,7 +31,7 @@
 pthread_mutex_t lock;
 
 /*
- * Estructura utilizada para el pasaje de parametro
+ * Estructura utilizada para el pasaje de parametros
  * a los hilos
  *
  * Cuando se ejecuta el programa cliente, en la
@@ -222,6 +222,13 @@ void *sendRequest(void *args) {
      * Los comandos para las luces, el riego, la imagen,
      * la desconexion, el ping y el id hacen uso de TCP
      */
+
+    /*
+     * Se comprueba que lo ingresado por el teclado sea
+     * la cadena "turnon", la cual esta contenida en
+     * la constante TURN_ON, y asi se hace con el
+     * resto de los comandos
+     */
     if (strcmp(nameCommandBuf, TURN_ON) == 0) {
       /*
        * Se coloca en el primer lugar de sendBuffer
@@ -408,10 +415,22 @@ void *sendRequest(void *args) {
      * Si el comando es para UDP, se tiene que ejecutar
      * haciendo uso del protocolo UDP
      *
-     * Comandos: Audio
+     * Comandos que hace uso de UDP: Audio
      */
     if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
+      /*
+       * Se coloca en el primer lugar de sendBuffer
+       * el modo de operacion, en este caso UDP
+       */
       strcat(sendBuffer, FIELD_UDP);
+
+      /*
+       * Luego de colocar el modo de operacion en
+       * sendBuffer, se coloca lo que se ingreso
+       * por el teclado, lo cual es el nombre
+       * del comando seguido del ID de un
+       * departamento en caso de que sea provisto
+       */
       strcat(sendBuffer, inputBuffer);
 
       displayCommandExecuted(S_AUDIO);
@@ -457,7 +476,9 @@ void *sendRequest(void *args) {
       getsockname(socketTcpFd, (struct sockaddr *) &addrClient, &len);
 
       /*
-       * Este cliente le envia al servidor (por TCP) sus datos
+       * Este cliente le envia al servidor (por TCP) sus datos (IP y
+       * puerto) para que el servidor pueda comunicarse con este cliente
+       * mediante el protocolo UDP
        */
       numWrite = write(socketTcpFd, (void *) &addrClient, len);
 
@@ -501,12 +522,20 @@ void *sendRequest(void *args) {
 
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de recibir lo que el
+ * servidor (con el cual esta conectado este cliente) le envia
+ * por TCP
+ *
+ * @param  args [se utiliza una estructura como argumento de esta funcion]
+ * @return
+ */
 void *receiveTcpResponse(void *args) {
   struct structparams *params = (struct structparams *) args;
 
+  int socketTcpFd = params -> socketTcpFd;
   int numRead;
   int numWrite;
-  int socketTcpFd = params -> socketTcpFd;
 
   char outputBuffer[BUF_SIZE];
 
@@ -518,12 +547,21 @@ void *receiveTcpResponse(void *args) {
       exit(EXIT_FAILURE);
     }
 
+    /*
+     * El cliente comprueba si lo recibido de parte del
+     * servidor es igual a "sendaudio", valor que esta
+     * contenido en la constante S_AUDIO
+     */
     if (strcmp(outputBuffer, S_AUDIO) == 0) {
       // printf("[CLIENT][RECEIVER][TCP] Recibó la notificación de parte del servidor de que alguien quiere hablar conmigo mediante UDP\n", "");
       // printf("[CLIENT][RECEIVER][TCP] Lo que voy a hacer es enviarle al servidor mi IP y puerto\n", "");
       struct sockaddr_in addr;
       socklen_t len = sizeof(struct sockaddr_in);
 
+      /*
+       * Este cliente receptor obtiene sus datos (IP y puerto)
+       * asociados a su socket TCP
+       */
       int resultGetSockName = getsockname(socketTcpFd, (struct sockaddr *) &addr, &len);
 
       if (resultGetSockName == -1) {
@@ -536,7 +574,7 @@ void *receiveTcpResponse(void *args) {
       // printf("[CLIENT][RECEIVER][TCP] IP adress: %s\n", inet_ntoa(addr.sin_addr));
 
       /*
-       * El cliente receptor le envia al servidor (mediante el socket TCP)
+       * Este cliente receptor le envia al servidor (mediante el socket TCP)
        * su direccion IP y puerto
        */
       numWrite = write(socketTcpFd, (const void *) &addr, sizeof(addr));
@@ -568,6 +606,14 @@ void *receiveTcpResponse(void *args) {
 
 }
 
+/**
+ * Esta funcion tiene la responsabilidad de recibir lo que el
+ * servidor (con el cual esta conectado este cliente) le envia
+ * por UDP
+ *
+ * @param  args [se utiliza una estructura como argumento de esta funcion]
+ * @return
+ */
 void *receiveUdpResponse(void *args) {
   struct structparams *params = (struct structparams *) args;
 

@@ -37,7 +37,7 @@ void addClient(int connectionfd, int socketUdpFd, int *amountConnections, pthrea
 
 // void addClient(int connectionfd, int *amountConnections, pthread_mutex_t lock, int clients[]);
 
-void removeClient(int clients[], int connectionfd, int *amountConnections);
+void removeClient(int clients[], int clientsUdp[], int connectionfd, int *amountConnections);
 
 void concatenateTextNotification(char* notification, char* firstPartNotification, char* secondPartNotification, int senderDepartmentId);
 
