@@ -417,12 +417,12 @@ void *sendRequest(void *args) {
      *
      * Comandos que hace uso de UDP: Audio
      */
-    if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
+    // if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
       /*
        * Se coloca en el primer lugar de sendBuffer
        * el modo de operacion, en este caso UDP
        */
-      strcat(sendBuffer, FIELD_UDP);
+      // strcat(sendBuffer, FIELD_UDP);
 
       /*
        * Luego de colocar el modo de operacion en
@@ -431,16 +431,16 @@ void *sendRequest(void *args) {
        * del comando seguido del ID de un
        * departamento en caso de que sea provisto
        */
-      strcat(sendBuffer, inputBuffer);
+      // strcat(sendBuffer, inputBuffer);
 
-      displayCommandExecuted(S_AUDIO);
-      displayDataSent(sendBuffer);
+      // displayCommandExecuted(S_AUDIO);
+      // displayDataSent(sendBuffer);
 
       /*
        * El cliente le envia el comando sendaudio al servidor con el
        * que esta conectado
        */
-      numWrite = write(socketTcpFd, sendBuffer, BUF_SIZE);
+      // numWrite = write(socketTcpFd, sendBuffer, BUF_SIZE);
 
       /*
        * Pasos para conectar el socket UDP del cliente con
@@ -453,42 +453,42 @@ void *sendRequest(void *args) {
        * 3. Luego, utilizar la estructura de tipo sockaddr_in
        * en la llamada al sistema sendto
        */
-      socklen_t len = sizeof(struct sockaddr_in);
-      struct sockaddr_in addr;
+      // socklen_t len = sizeof(struct sockaddr_in);
+      // struct sockaddr_in addr;
 
       /*
        * El cliente recibe los datos del servidor asociados al socket
        * UDP del mismo, los cuales son la direccion IP y el puerto
        */
-      numRead = read(socketTcpFd, (void *) &addr, len);
+      // numRead = read(socketTcpFd, (void *) &addr, len);
 
       // printf("%s\n", "");
       // printf("%s\n", "[CLIENT] UDP data");
       // printf("[CLIENT] Port: %d\n", ntohs(addr.sin_port));
       // printf("[CLIENT] IP adress: %s\n", inet_ntoa(addr.sin_addr));
 
-      struct sockaddr_in addrClient;
+      // struct sockaddr_in addrClient;
 
       /*
        * Obtiene los datos de este cliente asociados al descriptor
        * de archivo de un socket TCP
        */
-      getsockname(socketTcpFd, (struct sockaddr *) &addrClient, &len);
+      // getsockname(socketTcpFd, (struct sockaddr *) &addrClient, &len);
 
       /*
        * Este cliente le envia al servidor (por TCP) sus datos (IP y
        * puerto) para que el servidor pueda comunicarse con este cliente
        * mediante el protocolo UDP
        */
-      numWrite = write(socketTcpFd, (void *) &addrClient, len);
-
-      if (numWrite == -1) {
-        perror("write");
-        exit(EXIT_FAILURE);
-      }
-
-      sendInvalidCommand = false;
-    }
+    //   numWrite = write(socketTcpFd, (void *) &addrClient, len);
+    //
+    //   if (numWrite == -1) {
+    //     perror("write");
+    //     exit(EXIT_FAILURE);
+    //   }
+    //
+    //   sendInvalidCommand = false;
+    // }
 
     /*
      * Si la variable booleana sendInvalidCommand es verdadera

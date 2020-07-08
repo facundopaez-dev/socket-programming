@@ -48,3 +48,8 @@ Para los comandos callto y sendaudio:
 - En el caso en el cual no existe el número de departamento se devuelve el mensaje "department number does not exist".
 - En el caso de que sí existe el número de departamento y el cliente solicitado no esté conectado se devuelve el mensaje "the requested client is not connected".
 - En el caso en el cual se utiliza como argumento el número de departamento del emisor se devuelve el mensaje "Can't send a message to the same department".
+
+## Nota para el caso de usar un cliente distinto al que está implementado en este proyecto
+Si se desea probar el programa servidor haciendo uso de un programa cliente distinto al que está implementado en este proyecto se tiene que anteponer la palabra "tcp", seguida de un espacio y el nombre del comando a probar. Se tiene que recordar que se usa el protocolo TCP para el encendido y apagado de las luces, la activación y desactivación del riego automático, la transmisión de una imagen, la desconexión, el envío y recepción de llamadas, la verificación de si el servidor está en funcionamiento y la consulta por el ID del departamento.
+
+Si el comando de chat estuviese implementado, éste utilizaría el protocolo UDP ya que es la única funcionalidad que está pensada para que ha uso de dicho protocolo.

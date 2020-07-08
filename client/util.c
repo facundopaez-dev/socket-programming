@@ -92,7 +92,7 @@ int getFdSocketTcp(char* ip, char* port) {
 
 /*
  * Recibir IP y puerto como numero, o va
- * a tener q recibir el socket TCP para averiguar
+ * a tener que recibir el socket TCP para averiguar
  * IP y puerto locales
  *
  * Esto se lo tiene que hacer despues de ejecutar connect()
@@ -106,7 +106,7 @@ int getFdSocketTcp(char* ip, char* port) {
  * @param  socketTcpFd
  * @return el descriptor de archivo del socket UDP creado
  * con la IP y el puerto asociado al descriptor de archivo
- * de un socket TCP           
+ * de un socket TCP
  */
 int getFdSocketUdp(int socketTcpFd) {
   int socketUdpFd;

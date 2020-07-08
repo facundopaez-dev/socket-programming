@@ -313,8 +313,8 @@ void *handleRequest(void *args) {
        *
        * Comandos: Audio
        */
-      if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
-        printf("[SERVER] Command executed: %s\n", S_AUDIO);
+      // if (strcmp(nameCommandBuf, S_AUDIO) == 0) {
+      //   printf("[SERVER] Command executed: %s\n", S_AUDIO);
 
         /*
          * 1. Avisarle por TCP al cliente receptor que alguien
@@ -328,35 +328,35 @@ void *handleRequest(void *args) {
          * de la funcion sendaudio
          */
 
-        int receiverTcpFd = clients[idDepartment - 1];
+        // int receiverTcpFd = clients[idDepartment - 1];
 
         /*
          * 1. Se le avisa al cliente receptor de que alguien quiere
          * hablar con el, esto lo hace para poder recibir los datos
          * del cliente receptor
          */
-        resultWrite = write(receiverTcpFd, S_AUDIO, BUF_SIZE);
+        // resultWrite = write(receiverTcpFd, S_AUDIO, BUF_SIZE);
+        //
+        // if (resultWrite == -1) {
+        //   perror("write");
+        //   exit(EXIT_FAILURE);
+        // }
 
-        if (resultWrite == -1) {
-          perror("write");
-          exit(EXIT_FAILURE);
-        }
-
-        struct sockaddr_in addrReceiver;
+        // struct sockaddr_in addrReceiver;
 
         /*
          * 2. El servidor recibe los datos del cliente receptor, los cuales
          * son la direccion IP y puerto
          */
-        numRead = read(receiverTcpFd, (void *) &addrReceiver, sizeof(struct sockaddr_in));
-
-        if (numRead == -1) {
-          perror("read");
-          exit(EXIT_FAILURE);
-        }
-
-        sendAudio(socketUdpFd, idDepartment, addrSender, addrReceiver, clientsUdp);
-      }
+      //   numRead = read(receiverTcpFd, (void *) &addrReceiver, sizeof(struct sockaddr_in));
+      //
+      //   if (numRead == -1) {
+      //     perror("read");
+      //     exit(EXIT_FAILURE);
+      //   }
+      //
+      //   sendAudio(socketUdpFd, idDepartment, addrSender, addrReceiver, clientsUdp);
+      // }
 
     } // End if UDP_MODE
 
