@@ -548,6 +548,96 @@ void *receiveTcpResponse(void *args) {
     }
 
     /*
+     * Este cliente comprueba que el servidor le haya enviado
+     * el aviso de transmision de un archivo, si es asi la
+     * transmision de un archivo puede empezar dependiendo
+     * de si existe o no en el directorio del servidor
+     */
+    if (strcmp(outputBuffer, S_IMAGE) == 0) {
+      off_t fileSize;
+
+      /*
+       * En esta linea de codigo, este cliente lee de parte
+       * del servidor uno de los siguientes avisos: Archivo
+       * existente (contenido en la constante EXISTING_FILE),
+       * archivo inexistente (contenido en la constante
+       * NONEXISTING_FILE)
+       */
+      numRead = read(socketTcpFd, outputBuffer, BUF_SIZE);
+
+      if (numRead == -1) {
+        perror("read");
+        exit(EXIT_FAILURE);
+      }
+
+      /*
+       * Este cliente comprueba que de parte del servidor
+       * recibe el aviso "Archivo existente", si es asi
+       * inicia la transferencia de un archivo de parte
+       * del servidor a este cliente
+       */
+      if (strcmp(outputBuffer, EXISTING_FILE) == 0) {
+        /*
+         * Este cliente lee el tamaño del archivo a recibir
+         */
+        int resultRecv = recv(socketTcpFd, &fileSize, sizeof(fileSize), 0);
+
+        if (resultRecv == -1) {
+          perror("recv");
+          exit(EXIT_FAILURE);
+        }
+
+        fileSize = ntohl(fileSize);
+
+        printf("[CLIENT RECEIVER] File size: %ld\n", fileSize);
+
+        char buffer[BUF_SIZE];
+        char fileName[BUF_SIZE] = FILE_NAME;
+
+        int bytesReceived = 0;
+        int flags = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
+        int fileFd = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, flags);
+
+        /*
+         * Inicia la transferencia del archivo de parte del servidor
+         * a este cliente
+         */
+        while (bytesReceived < fileSize) {
+          resultRecv = recv(socketTcpFd, buffer, BUF_SIZE, 0);
+
+          if (resultRecv == -1) {
+            perror("recv");
+            exit(EXIT_FAILURE);
+          }
+
+          if (resultRecv == 0) {
+            perror("0");
+            exit(EXIT_FAILURE);
+          }
+
+          write(fileFd, buffer, resultRecv);
+          bytesReceived += resultRecv;
+        } // End while
+
+        resetBuffer(outputBuffer);
+        strcat(outputBuffer, EXISTING_FILE);
+        close(fileFd);
+        printf("[CLIENTE][TCP] %s\n", "Image file received");
+      } // End if EXISTING_FILE
+
+      /*
+       * Este cliente comprueba que de parte del servidor
+       * recibe el aviso "Archivo inexistente", si es asi
+       * no se realiza la transferencia del archivo de parte
+       * del servidor a este cliente
+       */
+      if (strcmp(outputBuffer, NONEXISTING_FILE) == 0) {
+        printf("[CLIENT][TCP] %s\n", "No such file");
+      }
+
+    } // End if S_IMAGE
+
+    /*
      * El cliente comprueba si lo recibido de parte del
      * servidor es igual a "sendaudio", valor que esta
      * contenido en la constante S_AUDIO
